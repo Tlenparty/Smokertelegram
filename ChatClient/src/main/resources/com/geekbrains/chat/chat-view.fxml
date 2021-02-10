@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.effect.*?>
+<?import javafx.scene.layout.*?>
+
+<AnchorPane prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.geekbrains.chat.controllers.ChatController">
+   <children>
+      <SplitPane layoutX="164.0" prefHeight="400.0" prefWidth="434.0">
+         <items>
+            <AnchorPane prefHeight="399.0" prefWidth="409.0">
+               <children>
+                  <TextArea fx:id="chatHistory" layoutX="15.0" layoutY="63.0" prefHeight="257.0" prefWidth="414.0">
+                     <effect>
+                        <Blend />
+                     </effect>
+                  </TextArea>
+                  <AnchorPane layoutX="13.0" layoutY="290.0" prefHeight="109.0" prefWidth="414.0">
+                     <children>
+                        <TextField fx:id="textField" layoutX="2.0" layoutY="55.0" prefHeight="54.0" prefWidth="330.0" promptText="Введите сообщение" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="2.0" AnchorPane.rightAnchor="82.0" AnchorPane.topAnchor="55.0" />
+                        <Button fx:id="sendButton" layoutX="331.0" layoutY="55.0" mnemonicParsing="false" prefHeight="54.0" prefWidth="83.0" text="Отправить" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="331.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="55.0" />
+                        <ChoiceBox fx:id="userSend" layoutX="2.0" layoutY="30.0" prefWidth="150.0" />
+                     </children>
+                  </AnchorPane>
+                  <Label fx:id="usernameTitle" layoutX="363.0" layoutY="20.0" prefHeight="17.0" prefWidth="49.0" />
+                  <HBox />
+                  <Label layoutX="194.0" layoutY="37.0" text="Окно чата" />
+               </children>
+            </AnchorPane>
+         </items>
+      </SplitPane>
+      <AnchorPane layoutX="-2.0" layoutY="-2.0" prefHeight="400.0" prefWidth="165.0">
+         <children>
+            <ListView fx:id="usersList" layoutY="63.0" prefHeight="340.0" prefWidth="158.0" />
+            <Label layoutX="34.0" layoutY="37.0" text="Пользователи" />
+         </children>
+      </AnchorPane>
+   </children>
+</AnchorPane>
