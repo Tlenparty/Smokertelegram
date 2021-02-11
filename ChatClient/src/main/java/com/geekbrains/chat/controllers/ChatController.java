@@ -76,15 +76,11 @@ public class ChatController {
 
 
 
-
-    // Отвечает за отправку на экран. Принмиет текст из поля
-
     private void sendMessage(){  // Отправка сообщения на нетворк + вывод на экран
         String message = textField.getText();
         appendMessage("Я: " + message); // добавляет текст.
         textField.clear();
 
-        // Получим класс Network
         try {
             // Отправляем сообщение на сервер
            // network.sendMessage(message); // get.Out().writeUTF(message);

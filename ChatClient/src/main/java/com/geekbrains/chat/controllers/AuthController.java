@@ -17,19 +17,16 @@ public class AuthController {
     private Network network;
     private NetworkClient networkClient;
 
-    // Метод для проверка аунтификации
     @FXML
     public void checkAuth() {
         String login = loginField.getText();
         String password = passwordField.getText();
 
-        // На нетворк передадим данные. Нетворк на сервер. Сервер проверит. И возвр. юзернейм
         if (login.isBlank() || password.isBlank()) {
             NetworkClient.showErrorMessage("Ошибка авторизации", "Ошибка ввода", "Поля не должны быть пустыми");
             return;
         }
 
-        // У нетворка создадим метод. Отправка на авторизацию
         String authErrorMessage = network.sendAuthCommand(login, password);
         // Если будет ошибка, то алерт
         if (authErrorMessage != null) {

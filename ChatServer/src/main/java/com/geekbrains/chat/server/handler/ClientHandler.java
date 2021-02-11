@@ -7,6 +7,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.sql.SQLException;
 
 public class ClientHandler {
 
@@ -32,71 +33,48 @@ public class ClientHandler {
         this.clientSocket = clientSocket;
     }
 
-
     public void handle() throws IOException {
         in = new DataInputStream(clientSocket.getInputStream());
         out = new DataOutputStream(clientSocket.getOutputStream());
-
-
         new Thread(() -> {
-            // аутентификация  + чтение ожидания и чтение сообщений
             try {
                 authentication();
-                readMessage(); // Сможет нам вернуть ощибку
-
+                readMessage();
             } catch (IOException e) {
                 e.printStackTrace();
                 System.out.println(e.getMessage());
+            } catch (SQLException | ClassNotFoundException throwables) {
+                throwables.printStackTrace();
             }
 
         }).start();
     }
 
+    private void authentication() throws IOException, SQLException, ClassNotFoundException {
+        String message = in.readUTF();
 
-    private void authentication() throws IOException {
-        // во вр. аутнефикации клинет отправит логин и пароль
-        String message = in.readUTF();// принимаем сообщение c консоли
-        // Нужыне перфиксы для мессаджа . И для этого будем строку парсить
-        // Чтобы по-разному наши сообщения делать. Отправка кому-то, логин пароль, всем
 
         while (true) {
             if (message.startsWith(AUTH_CMD_PREFIX)) {
-                // если сообщение начинается на /auth то
-                String[] parts = message.split("\\s+", 3); // регулярное выражение
-                // ожидаем 1 пробел или несколько и будем делить на 3 части наше сообщение
-                // Получаем логин и пароль
-                String login = parts[1];
+                String[] parts = message.split("\\s+", 3);
+                 String login = parts[1];
                 String password = parts[2];
-                // CH будет обращаться к серверу и забирать у него сервисаунтифик
                 AuthService authService = myServer.getAuthService();
                 username = authService.getUsernameByLoginAndPassword(login, password);
-                // на выходе ждем имя пользователя
                 if (username != null) {
-                    // никнейм незанят
                     if (myServer.isUsernameBusy(username)) {
-                        // Если клиент занят, то оповестим с сервера, клинету об этом
                         out.writeUTF(String.format("%s %s", AUTHERR_CMD_PREFIX, "Логин уже используется"));
                     }
                     out.writeUTF(String.format("%s %s", AUTHOK_CMD_PREFIX, username));
-                    // оповестим пользователей о подключении новичка
-                    // Будет строка.Для продкаста передадим handle ч/з this. True - флаг серверное ли сообщение или нет
                     myServer.broadcastMessage(String.format(">>>>> %s подключился к чату", username), this, true);
-                    // зарегистрировать клиента
-                    //должен быть список клиентов. уточнить не подключен ли уже пользлователь.
-                    //myServer будет хранить все хэндлеры с пользователями (subscribe)
-                    myServer.subscribe(this); // на вход будем  отдавать текущий хэндлер
-
+                    myServer.subscribe(this);
                     String userList = USER_LIST;
-
                     for (ClientHandler client : myServer.getClients()) {
                         userList = userList + " " + client.getUsername();
                     }
                     myServer.broadcastUserList(userList, false);
-
                     break;
-
                 } else {
-                    // То не прошла авторизация
                     out.writeUTF(String.format("%s %s", AUTHERR_CMD_PREFIX, "Логин или пароль не соответсвтуют" +
                             " действительности"));
                 }
@@ -127,9 +105,9 @@ public class ClientHandler {
                 for (ClientHandler client : myServer.getClients()) {
                     userList = userList + " " + client.getUsername();
                 }
-                myServer.broadcastUserList(userList, false);  // Отправка сообщений пользавателям
                 myServer.broadcastUserList(userList, false);
-                return; // Выхожим. Завершаем действие хэндлера
+                myServer.broadcastUserList(userList, false);
+                return;
 
             } else if (message.startsWith(PRIVATE_MSG_PREFIX)) {
                 parts = message.split("\\s+", 3);
@@ -137,7 +115,6 @@ public class ClientHandler {
                 message = parts[2];
                 myServer.privateMessage(message, this, recipient,false);
             } else {
-                // Мы будем просто выводить на экран всем. false значит не серверное сообщение
                 myServer.broadcastMessage(message, this, false);
             }
         }

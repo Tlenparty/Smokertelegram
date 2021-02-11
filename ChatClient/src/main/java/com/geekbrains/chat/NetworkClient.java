@@ -110,7 +110,6 @@ public class NetworkClient extends Application {
         alert.setTitle(title);
         alert.setHeaderText(message);
         alert.setContentText(errorMessage);
-        //Покажем алерт
         alert.showAndWait();
 
     }

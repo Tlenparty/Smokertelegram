@@ -34,10 +34,6 @@ public class Network {
 
     private String username;
 
-
-
-    // Создадим конструкторы
-
     public Network() {
         this(SERVER_PORT, SERVER_HOST);
 
@@ -48,7 +44,6 @@ public class Network {
         this.host = serverHost;
     }
 
-    // Метод подключает текущего клиента к сервер сокету
     public boolean connect() {
         try {
             socket = new Socket(host, port);
@@ -62,7 +57,6 @@ public class Network {
         }
     }
 
-    // закроем сокет
 
     public void close() {
         try {
@@ -84,8 +78,8 @@ public class Network {
         return out;
     }
 
-    // Прослушивает порт и ждет не напишут ли нам . Новый поток блокирующий.
-    public void waitMessage(ChatController chatController) {
+
+    public void waitMessage(ChatController chatController){
         // Должен создавать поток. Который блокируется
         Thread thread = new Thread(() -> {
             try {
@@ -99,8 +93,6 @@ public class Network {
                         userList.clear();
                         userList.addAll(Arrays.asList(parts).subList(1, parts.length));
                         Platform.runLater(chatController::newUserList);
-                        // Вывод на экран ч/з runLater. Чтоби изменять поток UI не сразу,а указать очередь
-                        // Как только UI будет свободен и сможет вывести сообщение то мы сможем это сделать
 
                     } else if(message.startsWith(CLIENT_MSG_PREFIX)) {
                         String[] parts = message.split("\\s+", 3);
@@ -131,28 +123,21 @@ public class Network {
                 NetworkClient.showErrorMessage("Ошибка подключения", "", e.getMessage());
             }
         });
-        thread.setDaemon(true); // фоновый поток. Хорош если закрываем приложение демон тоже закрывается
+        thread.setDaemon(true);
         thread.start();
 
 
     }
 
     public String sendAuthCommand(String login, String password) {
-        // На уровне клиента мы ждем сообщение в кот. будет 3 значения
-        // префикс об аунтификации и логин и пароль
+
         try {
 
-            // Отправляем логин и пароль на сервер
             sendMessage(String.format("%s %s %s", AUTH_CMD_PREFIX, login, password));
-
-            // Отправляем и ждем отвте от сервера
             String response = in.readUTF();
 
-            // как тока пришел ответ реагируем
-            // если начинается со строк auth
             if (response.startsWith(AUTHOK_CMD_PREFIX)) {
-                // если прошли уинтификацию. Берем ответ от сервера и делим на сост части
-                this.username = response.split("\\s+", 2)[1]; // если все ок делим на 2 части
+                this.username = response.split("\\s+", 2)[1];
                 return null; // Возвращаем ошибку
             }
             return response.split("\\s+", 2)[1];

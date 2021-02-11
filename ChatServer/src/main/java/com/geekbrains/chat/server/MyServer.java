@@ -49,12 +49,11 @@ public class MyServer {
         }
     }
 
-    // ждет и обрабатывает соединение клиента
+
     private void waitAndProcessNewClientConnection() throws IOException {
         System.out.println("Ожидание пользователя...");
         Socket clientSocket = serverSocket.accept(); // слушает
         System.out.println("Клиент подключился!");
-        // 5 clientSocket сокет от нашего клиента. И его отдадим тому кто раб. с ним (в поток)
         processClientConnection(clientSocket);
     }
 
