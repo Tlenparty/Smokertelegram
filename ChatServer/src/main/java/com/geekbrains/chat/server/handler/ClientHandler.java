@@ -2,12 +2,14 @@ package com.geekbrains.chat.server.handler;
 
 import com.geekbrains.chat.server.MyServer;
 import com.geekbrains.chat.server.auth.AuthService;
+import com.geekbrains.chat.server.auth.BaseAuthService;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.sql.SQLException;
+import java.sql.Statement;
 
 public class ClientHandler {
 
@@ -18,6 +20,7 @@ public class ClientHandler {
     private static final String CLIENT_MSG_PREFIX = "/clientMsg"; // сигнал о завершении
     private static final String SERVER_MSG_PREFIX = "/serverMsg"; // сигнал о завершении
     private static final String END_CMD = "/end"; // сигнал о завершении
+    public static final String CHANGE_USERNAME_PREFIX = "/changeUsername";
     private static final String USER_LIST = "/userList";
 
 
@@ -25,6 +28,7 @@ public class ClientHandler {
     private final Socket clientSocket;
     private DataInputStream in;
     private DataOutputStream out;
+    private static Statement stmt;
     private String username;
 
     // 6  Принимает myServer и clientSocket
@@ -57,7 +61,7 @@ public class ClientHandler {
         while (true) {
             if (message.startsWith(AUTH_CMD_PREFIX)) {
                 String[] parts = message.split("\\s+", 3);
-                 String login = parts[1];
+                String login = parts[1];
                 String password = parts[2];
                 AuthService authService = myServer.getAuthService();
                 username = authService.getUsernameByLoginAndPassword(login, password);
@@ -83,7 +87,6 @@ public class ClientHandler {
             }
         }
     }
-
 
 
     public synchronized void sendUserList(String userLists) throws IOException {
@@ -113,7 +116,25 @@ public class ClientHandler {
                 parts = message.split("\\s+", 3);
                 recipient = parts[1];
                 message = parts[2];
-                myServer.privateMessage(message, this, recipient,false);
+                myServer.privateMessage(message, this, recipient, false);
+            } else if (message.startsWith(CHANGE_USERNAME_PREFIX)) {
+                parts = message.split("\\s+", 3);
+                String oldUsername = parts[1];
+                String newUsername = parts[2];
+                try {
+                    BaseAuthService.connection();
+                    int result = stmt.executeUpdate(String.format("UPDATE auth " +
+                                    "SET username = '%s' " +
+                                    "WHERE username = '%s'",
+                            newUsername, oldUsername));
+                    out.writeUTF(String.format("%s %s", CHANGE_USERNAME_PREFIX, newUsername));
+                    System.out.println("Имя сменилось");
+                    myServer.broadcastMessage(String.format(">>>>>>>> %s сменил имя", newUsername), this, true);
+                    System.out.println(result);
+                    BaseAuthService.disconnect();
+                } catch (ClassNotFoundException | SQLException e) {
+                    e.printStackTrace();
+                }
             } else {
                 myServer.broadcastMessage(message, this, false);
             }
@@ -125,20 +146,18 @@ public class ClientHandler {
     }
 
 
-    public synchronized void sendMessage(String sender,  String message) throws IOException {
+    public synchronized void sendMessage(String sender, String message) throws IOException {
         if (sender == null) {
             out.writeUTF(String.format("%s %s", SERVER_MSG_PREFIX, message));
-        }
-        else {
-            out.writeUTF(String.format("%s %s %s ", CLIENT_MSG_PREFIX, sender,  message));
+        } else {
+            out.writeUTF(String.format("%s %s %s ", CLIENT_MSG_PREFIX, sender, message));
         }
     }
 
     public synchronized void sendMessage(String sender, String recipient, String message) throws IOException {
         if (sender == null) {
             out.writeUTF(String.format("%s %s", SERVER_MSG_PREFIX, message));
-        }
-        else {
+        } else {
             out.writeUTF(String.format("%s %s %s %s", PRIVATE_MSG_PREFIX, sender, recipient, message));
         }
     }

@@ -33,13 +33,20 @@ public class ChatController {
     @FXML
     private ChoiceBox<String> userSend;
 
+    @FXML
+    private TextField changeNameFieldID;
+
+    @FXML
+    private Hyperlink changeNameLinkID;
+
+
 
     private Network network;
 
     private List <String> user = new ArrayList<>();
 
-    // Нетворкчат (эко клиент) знает нетворк.
 
+    // Нетворкчат (эко клиент) знает нетворк.
     public void setNetwork(Network network) {
         this.network = network;
     }
@@ -112,6 +119,30 @@ public class ChatController {
 
 
     public void setUsernameTitle(String username) {
+
+
+    }
+    // смена ника
+    public void openChangeNameField(){
+        changeNameFieldID.setVisible(true);
+        changeNameLinkID.setVisible(false);
+        changeNameFieldID.setText(usernameTitle.getText());
+
+    }
+
+
+    // Отправка нового никнейма на нетворк
+    public void updateUsername(){
+        String oldUsername = network.getUsername();
+        String newUsername = changeNameLinkID.getText();
+        if(newUsername.isBlank()){
+            NetworkClient.showErrorMessage("Ошибка смены имени","Ошибка ввода ","Поле не должно " +
+                    "быть пустым ");
+            return;
+        }
+        network.sendChangeNameCommand(oldUsername, newUsername);
+        changeNameLinkID.setVisible(true);
+        changeNameFieldID.setVisible(false);
 
 
     }

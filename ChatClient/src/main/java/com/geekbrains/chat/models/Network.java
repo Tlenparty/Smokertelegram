@@ -17,10 +17,11 @@ public class Network {
     private static final String AUTHOK_CMD_PREFIX = "/authok"; // Если аут окей
     private static final String AUTHERR_CMD_PREFIX = "/autherr"; // Если ошибка
     private static final String PRIVATE_MSG_PREFIX = "/w";  // для лс
-    private static final String CLIENT_MSG_PREFIX = "/clientMsg"; // сигнал о завершении
+    private static final String CLIENT_MSG_PREFIX = "/clientMsg"; // сигнал о завершении сообщения
     private static final String SERVER_MSG_PREFIX = "/serverMsg"; // сигнал о завершении
     private static final String END_CMD = "/end"; // сигнал о завершении
     private static final String USER_LIST = "/userList";
+    public static final String CHANGE_USERNAME_PREFIX = "/changeUsername";
     public static List<String> userList = new ArrayList<>();
 
     private static final int SERVER_PORT = 8189;
@@ -79,7 +80,7 @@ public class Network {
     }
 
 
-    public void waitMessage(ChatController chatController){
+    public void waitMessage(ChatController chatController) {
         // Должен создавать поток. Который блокируется
         Thread thread = new Thread(() -> {
             try {
@@ -87,14 +88,13 @@ public class Network {
                     // Будем ждать из потока
                     String message = in.readUTF();
 
-
                     if (message.startsWith(USER_LIST)) {
                         String[] parts = message.split("\\s+");
                         userList.clear();
                         userList.addAll(Arrays.asList(parts).subList(1, parts.length));
-                        Platform.runLater(chatController::newUserList);
+                        Platform.runLater(() -> chatController.newUserList());
 
-                    } else if(message.startsWith(CLIENT_MSG_PREFIX)) {
+                    } else if (message.startsWith(CLIENT_MSG_PREFIX)) {
                         String[] parts = message.split("\\s+", 3);
                         String sender = parts[1];
                         String msgBody = parts[2];
@@ -112,6 +112,9 @@ public class Network {
                         String[] parts = message.split("\\s+", 2);
                         Platform.runLater(() -> chatController.appendMessage(parts[1]));
 
+               /*     }else if(message.startsWith(CHANGE_USERNAME_PREFIX)){
+                        String[] parts = message.split("\\s+",2);
+                        */
                     } else {
                         Platform.runLater(() -> NetworkClient.showErrorMessage("Неизвестная команда", message, ""));
                     }
@@ -156,11 +159,23 @@ public class Network {
         message = PRIVATE_MSG_PREFIX + " " + recipient + " " + message;
         out.writeUTF(message);
     }
-    public void sendExitMessage(){
+
+    public void sendExitMessage() {
         try {
             out.writeUTF(END_CMD);
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public void sendChangeNameCommand(String oldUsername, String newUsername) {
+
+        try {
+            sendMessage(String.format("%s %s %s", CHANGE_USERNAME_PREFIX, oldUsername, newUsername));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
     }
 }
