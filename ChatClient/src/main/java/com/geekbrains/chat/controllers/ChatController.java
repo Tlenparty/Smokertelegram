@@ -134,12 +134,13 @@ public class ChatController {
     // Отправка нового никнейма на нетворк
     public void updateUsername(){
         String oldUsername = network.getUsername();
-        String newUsername = changeNameLinkID.getText();
+        String newUsername = changeNameFieldID.getText();
         if(newUsername.isBlank()){
             NetworkClient.showErrorMessage("Ошибка смены имени","Ошибка ввода ","Поле не должно " +
                     "быть пустым ");
             return;
         }
+        usernameTitle.setText(changeNameFieldID.getText());
         network.sendChangeNameCommand(oldUsername, newUsername);
         changeNameLinkID.setVisible(true);
         changeNameFieldID.setVisible(false);

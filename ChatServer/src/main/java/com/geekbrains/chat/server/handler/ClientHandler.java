@@ -9,7 +9,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.sql.SQLException;
-import java.sql.Statement;
 
 public class ClientHandler {
 
@@ -28,7 +27,7 @@ public class ClientHandler {
     private final Socket clientSocket;
     private DataInputStream in;
     private DataOutputStream out;
-    private static Statement stmt;
+  //  private static Statement stmt;
     private String username;
 
     // 6  Принимает myServer и clientSocket
@@ -123,18 +122,26 @@ public class ClientHandler {
                 String newUsername = parts[2];
                 try {
                     BaseAuthService.connection();
-                    int result = stmt.executeUpdate(String.format("UPDATE auth " +
+                    int result = BaseAuthService.stmt.executeUpdate(String.format("UPDATE auth " +
                                     "SET username = '%s' " +
                                     "WHERE username = '%s'",
                             newUsername, oldUsername));
-                    out.writeUTF(String.format("%s %s", CHANGE_USERNAME_PREFIX, newUsername));
                     System.out.println("Имя сменилось");
-                    myServer.broadcastMessage(String.format(">>>>>>>> %s сменил имя", newUsername), this, true);
+                    myServer.broadcastMessage(String.format("%s >>>>>>>> сменил имя на %s",oldUsername, newUsername),
+                            this, true);
                     System.out.println(result);
                     BaseAuthService.disconnect();
                 } catch (ClassNotFoundException | SQLException e) {
                     e.printStackTrace();
                 }
+                String userList = USER_LIST;
+                this.username = newUsername;
+                for (ClientHandler client : myServer.getClients()) {
+                    userList = userList + " " + client.getUsername();
+                }
+                myServer.broadcastUserList(userList, false);
+
+
             } else {
                 myServer.broadcastMessage(message, this, false);
             }

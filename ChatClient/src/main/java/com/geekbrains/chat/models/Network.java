@@ -108,13 +108,9 @@ public class Network {
 
                         Platform.runLater(() -> chatController.appendMessage(String.format("%s: %s", sender, msgBody)));
 
-                    } else if (message.startsWith(SERVER_MSG_PREFIX)) {
+                    } else if (message.startsWith(SERVER_MSG_PREFIX) || message.startsWith(CHANGE_USERNAME_PREFIX)) {
                         String[] parts = message.split("\\s+", 2);
                         Platform.runLater(() -> chatController.appendMessage(parts[1]));
-
-               /*     }else if(message.startsWith(CHANGE_USERNAME_PREFIX)){
-                        String[] parts = message.split("\\s+",2);
-                        */
                     } else {
                         Platform.runLater(() -> NetworkClient.showErrorMessage("Неизвестная команда", message, ""));
                     }

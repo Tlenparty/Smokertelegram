@@ -5,9 +5,9 @@ import java.sql.*;
 public class BaseAuthService implements AuthService {
 
 
-    private static Connection connection;
-    private static Statement stmt;
-    private static ResultSet rs;
+    public static Connection connection;
+    public static Statement stmt;
+    public static ResultSet rs;
 
     public static void connection() throws ClassNotFoundException, SQLException {
         Class.forName("org.sqlite.JDBC");
