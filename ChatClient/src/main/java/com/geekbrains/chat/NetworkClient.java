@@ -90,8 +90,6 @@ public class NetworkClient extends Application {
         primaryStage.setTitle("SmokerTelegram");
         primaryStage.setScene(new Scene(root, 600, 400));
         // primaryStage.show(); По умолчанию не должно появляться
-
-        // Получим контроллер который будет работать с окном
         chatController = loader.getController();
         chatController.setNetwork(network); // для того чтобы передать network контроллеру
         // network.waitMessage(chatController);
@@ -126,6 +124,7 @@ public class NetworkClient extends Application {
         primaryStage.setTitle(network.getUsername());
         chatController.setLabel(network.getUsername());
         network.waitMessage(chatController);
+        chatController.chatHistoryDisplay();
     }
 
 }
