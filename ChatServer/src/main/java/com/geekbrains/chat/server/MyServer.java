@@ -70,7 +70,6 @@ public class MyServer {
     }
 
     public void subscribe(ClientHandler clientHandler) {
-        // метод будет работаь с коллекцией ClientHandler
         // берет хэндлер и добавляет
         clients.add(clientHandler);
     }

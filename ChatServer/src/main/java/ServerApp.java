@@ -8,7 +8,7 @@ public class ServerApp {
 
     public static void main(String[] args) {
         int port = DEFAULT_PORT;
-        if(args.length != 0){ // Программ аргументс.
+        if(args.length != 0){
             port = Integer.parseInt(args[0]); // Вытаскиваем 1 число
         }
 

@@ -33,13 +33,14 @@ public class Network {
     private DataOutputStream out;
     private Socket socket;
 
+    private String login;
+
     private String username;
 
     public Network() {
         this(SERVER_PORT, SERVER_HOST);
 
     }
-
     public Network(int serverPort, String serverHost) {
         this.port = serverPort;
         this.host = serverHost;
@@ -69,6 +70,14 @@ public class Network {
 
     public DataInputStream getIn() {
         return in;
+    }
+
+    public String getLogin() {
+        return login;
+    }
+
+    public void setLogin(String login) {
+        this.login = login;
     }
 
     public String getUsername() {
@@ -108,7 +117,7 @@ public class Network {
 
                         Platform.runLater(() -> chatController.appendMessage(String.format("%s: %s", sender, msgBody)));
 
-                    } else if (message.startsWith(SERVER_MSG_PREFIX) || message.startsWith(CHANGE_USERNAME_PREFIX)) {
+                    } else if (message.startsWith(SERVER_MSG_PREFIX)) {
                         String[] parts = message.split("\\s+", 2);
                         Platform.runLater(() -> chatController.appendMessage(parts[1]));
                     } else {

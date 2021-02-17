@@ -106,7 +106,7 @@ public class ChatController {
     public void appendMessage(String message) { // вывод на экран
 
         String timestamp = DateFormat.getInstance().format(new Date());
-        File file = new File("ChatClient/src/main/resources/com/geekbrains/lib/chatHistory.txt");
+        File file = new File(String.format("ChatClient/src/main/resources/com/geekbrains/lib/chatHistory_%s.txt", network.getLogin()));
         if (!file.exists()) {
             try {
                 file.createNewFile();
@@ -114,8 +114,7 @@ public class ChatController {
                 e.printStackTrace();
             }
         } else {
-            try {
-                FileOutputStream writer = new FileOutputStream(file,true);
+            try (FileOutputStream writer = new FileOutputStream(file,true)){
                 writer.write(timestamp.getBytes(StandardCharsets.UTF_8));
                 writer.write("\n".getBytes(StandardCharsets.UTF_8));
                 writer.write(message.getBytes(StandardCharsets.UTF_8));
@@ -133,7 +132,7 @@ public class ChatController {
     }
 
     public void chatHistoryDisplay()  {
-        File file = new File("ChatClient/src/main/resources/com/geekbrains/lib/chatHistory.txt");
+        File file = new File(String.format("ChatClient/src/main/resources/com/geekbrains/lib/chatHistory_%s.txt",network.getLogin()));
         if(file.exists()){
              try(BufferedReader in = new BufferedReader(new FileReader(file))){
                  String strLine;
