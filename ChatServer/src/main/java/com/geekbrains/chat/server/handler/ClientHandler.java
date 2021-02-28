@@ -3,6 +3,8 @@ package com.geekbrains.chat.server.handler;
 import com.geekbrains.chat.server.MyServer;
 import com.geekbrains.chat.server.auth.AuthService;
 import com.geekbrains.chat.server.auth.BaseAuthService;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -11,7 +13,7 @@ import java.net.Socket;
 import java.sql.SQLException;
 
 public class ClientHandler {
-
+    private static Logger logger = LogManager.getLogger(ClientHandler.class);
     private static final String AUTH_CMD_PREFIX = "/auth";
     private static final String AUTHOK_CMD_PREFIX = "/authok"; // Если аут окей
     private static final String AUTHERR_CMD_PREFIX = "/autherr"; // Если ошибка
@@ -27,7 +29,7 @@ public class ClientHandler {
     private final Socket clientSocket;
     private DataInputStream in;
     private DataOutputStream out;
-  //  private static Statement stmt;
+    //  private static Statement stmt;
     private String username;
 
     // 6  Принимает myServer и clientSocket
@@ -45,19 +47,18 @@ public class ClientHandler {
                 readMessage();
             } catch (IOException e) {
                 e.printStackTrace();
-                System.out.println(e.getMessage());
+                logger.error(e.getMessage(), e);
             } catch (SQLException | ClassNotFoundException throwables) {
-                throwables.printStackTrace();
+                logger.error(throwables.getMessage(), throwables);
             }
 
         }).start();
     }
 
     private void authentication() throws IOException, SQLException, ClassNotFoundException {
-        String message = in.readUTF();
-
 
         while (true) {
+            String message = in.readUTF();
             if (message.startsWith(AUTH_CMD_PREFIX)) {
                 String[] parts = message.split("\\s+", 3);
                 String login = parts[1];
@@ -67,9 +68,11 @@ public class ClientHandler {
                 if (username != null) {
                     if (myServer.isUsernameBusy(username)) {
                         out.writeUTF(String.format("%s %s", AUTHERR_CMD_PREFIX, "Логин уже используется"));
+                        logger.info("Логин уже используется");
                     }
                     out.writeUTF(String.format("%s %s", AUTHOK_CMD_PREFIX, username));
                     myServer.broadcastMessage(String.format(">>>>> %s подключился к чату", username), this, true);
+                    logger.info("Пользователь" + username + " Подключился к чату");
                     myServer.subscribe(this);
                     String userList = USER_LIST;
                     for (ClientHandler client : myServer.getClients()) {
@@ -80,9 +83,11 @@ public class ClientHandler {
                 } else {
                     out.writeUTF(String.format("%s %s", AUTHERR_CMD_PREFIX, "Логин или пароль не соответсвтуют" +
                             " действительности"));
+                    logger.info("Логин или пароль неверный");
                 }
             } else {
                 out.writeUTF(String.format("%s %s", AUTHERR_CMD_PREFIX, "Ошибка авторизации"));
+                logger.info("Ошибка авторизации");
             }
         }
     }
@@ -127,12 +132,14 @@ public class ClientHandler {
                                     "WHERE username = '%s'",
                             newUsername, oldUsername));
                     System.out.println("Имя сменилось");
-                    myServer.broadcastMessage(String.format("%s >>>>>>>> сменил имя на %s",oldUsername, newUsername),
+                    myServer.broadcastMessage(String.format("%s >>>>>>>> сменил имя на %s", oldUsername, newUsername),
                             this, true);
+                    logger.info(oldUsername + " сменил имя на " + newUsername);
                     System.out.println(result);
                     BaseAuthService.disconnect();
                 } catch (ClassNotFoundException | SQLException e) {
                     e.printStackTrace();
+                    logger.error(e.getMessage(), e);
                 }
                 String userList = USER_LIST;
                 this.username = newUsername;

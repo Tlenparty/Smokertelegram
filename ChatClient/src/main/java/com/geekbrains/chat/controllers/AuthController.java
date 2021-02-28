@@ -29,7 +29,7 @@ public class AuthController {
 
         String authErrorMessage = network.sendAuthCommand(login, password);
         if (authErrorMessage != null) {
-            NetworkClient.showErrorMessage("Ошибка авторизации", "Что-то не то", authErrorMessage);
+            NetworkClient.showErrorMessage("Ошибка авторизации", "Что-то не то, перезапустите окно авторизации", authErrorMessage);
         } else {
             network.setLogin(login);
             networkClient.openMainChatWindow(); // Если не пустое то откроется 2 окно и текущая вьюха закроется.

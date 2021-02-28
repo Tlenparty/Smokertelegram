@@ -3,6 +3,8 @@ package com.geekbrains.chat.server;
 import com.geekbrains.chat.server.auth.AuthService;
 import com.geekbrains.chat.server.auth.BaseAuthService;
 import com.geekbrains.chat.server.handler.ClientHandler;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -13,7 +15,7 @@ import java.util.List;
 
 public class MyServer {
 
-    // 2. Cоздадим конструктор.
+    private static Logger logger = LogManager.getLogger(MyServer.class);
     private final ServerSocket serverSocket;
     private final AuthService authService;
     private final List<ClientHandler> clients = new ArrayList<>();
@@ -32,17 +34,16 @@ public class MyServer {
 
 
     public void start() throws IOException {
-        // 4 Создание пользователей. Хэндлеровы
-        System.out.println("Сервер запущен");
+        // 4 Создание пользователей, хэндлеров
+        logger.info("Сервер запущен");
         authService.start();
         try {
             while (true) {
-                //Ждем подключения к серверу
                 waitAndProcessNewClientConnection();
             }
         } catch (IOException e) {
-            System.out.println("Ошибка создания нового подключения");
             e.printStackTrace();
+            logger.error("Ошибка создания нового подключения",e);
 
         } finally {
             serverSocket.close();
@@ -51,9 +52,10 @@ public class MyServer {
 
 
     private void waitAndProcessNewClientConnection() throws IOException {
-        System.out.println("Ожидание пользователя...");
-        Socket clientSocket = serverSocket.accept(); // слушает
-        System.out.println("Клиент подключился!");
+        logger.info("Ожидание пользователя");
+        Socket clientSocket = serverSocket.accept();
+        System.out.println("Клиент подключился");
+        logger.info("Клиент подключился");
         processClientConnection(clientSocket);
     }
 

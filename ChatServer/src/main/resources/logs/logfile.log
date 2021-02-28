@@ -1,0 +1,21 @@
+INFO  2021-02-28 14:33:58 [main] com.geekbrains.chat.server.MyServer (MyServer.java:38) - Сервер запущен
+INFO  2021-02-28 14:33:58 [main] com.geekbrains.chat.server.auth.BaseAuthService (BaseAuthService.java:29) - Сервер аунтификации запущен
+INFO  2021-02-28 14:33:58 [main] com.geekbrains.chat.server.MyServer (MyServer.java:55) - Ожидание пользователя
+INFO  2021-02-28 14:34:10 [main] com.geekbrains.chat.server.MyServer (MyServer.java:58) - Клиент подключился
+INFO  2021-02-28 14:34:10 [main] com.geekbrains.chat.server.MyServer (MyServer.java:55) - Ожидание пользователя
+INFO  2021-02-28 14:34:17 [Thread-0] com.geekbrains.chat.server.handler.ClientHandler (ClientHandler.java:75) - ПользовательВероникаКлубника Подключился к чату
+INFO  2021-02-28 14:34:25 [main] com.geekbrains.chat.server.MyServer (MyServer.java:58) - Клиент подключился
+INFO  2021-02-28 14:34:25 [main] com.geekbrains.chat.server.MyServer (MyServer.java:55) - Ожидание пользователя
+INFO  2021-02-28 14:34:31 [Thread-1] com.geekbrains.chat.server.handler.ClientHandler (ClientHandler.java:86) - Логин или пароль неверный
+INFO  2021-02-28 14:34:37 [Thread-1] com.geekbrains.chat.server.handler.ClientHandler (ClientHandler.java:75) - ПользовательДима Подключился к чату
+INFO  2021-02-28 14:34:44 [main] com.geekbrains.chat.server.MyServer (MyServer.java:58) - Клиент подключился
+INFO  2021-02-28 14:34:44 [main] com.geekbrains.chat.server.MyServer (MyServer.java:55) - Ожидание пользователя
+INFO  2021-02-28 14:35:00 [Thread-0] com.geekbrains.chat.server.handler.ClientHandler (ClientHandler.java:137) - ВероникаКлубника сменил имя на Вероника
+ERROR 2021-02-28 14:36:45 [Thread-2] com.geekbrains.chat.server.handler.ClientHandler (ClientHandler.java:50) - null
+java.io.EOFException: null
+	at java.io.DataInputStream.readUnsignedShort(DataInputStream.java:344) ~[?:?]
+	at java.io.DataInputStream.readUTF(DataInputStream.java:593) ~[?:?]
+	at java.io.DataInputStream.readUTF(DataInputStream.java:568) ~[?:?]
+	at com.geekbrains.chat.server.handler.ClientHandler.authentication(ClientHandler.java:61) ~[classes/:?]
+	at com.geekbrains.chat.server.handler.ClientHandler.lambda$handle$0(ClientHandler.java:46) ~[classes/:?]
+	at java.lang.Thread.run(Thread.java:832) [?:?]

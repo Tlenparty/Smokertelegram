@@ -140,15 +140,15 @@ public class Network {
     public String sendAuthCommand(String login, String password) {
 
         try {
-
             sendMessage(String.format("%s %s %s", AUTH_CMD_PREFIX, login, password));
             String response = in.readUTF();
 
             if (response.startsWith(AUTHOK_CMD_PREFIX)) {
                 this.username = response.split("\\s+", 2)[1];
-                return null; // Возвращаем ошибку
+                System.out.println(username);
+                return null; // Возвращаем null если ошибки нет.
             }
-            return response.split("\\s+", 2)[1];
+            return response.split("\\s+", 2)[1];  // Если ошибка
         } catch (IOException e) {
             e.printStackTrace();
         }
