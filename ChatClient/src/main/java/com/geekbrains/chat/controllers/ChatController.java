@@ -6,6 +6,9 @@ import com.geekbrains.chat.models.Network;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.scene.input.MouseEvent;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -42,11 +45,12 @@ public class ChatController {
 
 
     private Network network;
+    private String selectedRecipient;
 
     private List<String> user = new ArrayList<>();
+    private static Logger logger = LogManager.getLogger(ChatController.class);
 
-
-    // Нетворкчат (эко клиент) знает нетворк.
+    // NetworkChat(эко клиент) знает network.
     public void setNetwork(Network network) {
         this.network = network;
     }
@@ -67,7 +71,27 @@ public class ChatController {
         textField.setOnAction(event -> ChatController.this.sendMessage());
         sendButton.setOnAction(event -> ChatController.this.sendMessage());
 
-
+        // Отправка сообщения по нажатию на пользователя.
+        usersList.setCellFactory(lv -> {
+            MultipleSelectionModel<String> selectionModel = usersList.getSelectionModel();
+            ListCell<String> cell = new ListCell<>();
+            cell.textProperty().bind(cell.itemProperty());
+            cell.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+                usersList.requestFocus();
+                if (!cell.isEmpty()) {
+                    int index = cell.getIndex();
+                    if (selectionModel.getSelectedIndices().contains(index)) {
+                        selectionModel.clearSelection(index);
+                        selectedRecipient = null;
+                    } else {
+                        selectionModel.select(index);
+                        selectedRecipient = cell.getItem();
+                    }
+                    event.consume();
+                }
+            });
+            return cell;
+        });
     }
 
     public void newUserList() {
@@ -80,8 +104,8 @@ public class ChatController {
         usersList.setItems(FXCollections.observableArrayList(Network.userList));
     }
 
-
-    private void sendMessage() {  // Отправка сообщения на нетворк + вывод на экран
+    // Отправка сообщения на нетворк + вывод на экран
+    private void sendMessage() {
         String message = textField.getText();
         appendMessage("Я: " + message); // добавляет текст.
         textField.clear();
@@ -89,15 +113,19 @@ public class ChatController {
         try {
             // Отправляем сообщение на сервер
             // network.sendMessage(message); // get.Out().writeUTF(message);
-            if (userSend.getValue().equals("Всем")) {
+/*            if (userSend.getValue().equals("Всем")) {
                 network.sendMessage(message);
+            } */
+            if (selectedRecipient != null) {
+                network.sendPrivateMessage(message, selectedRecipient);
             } else {
-                network.sendPrivateMessage(message, userSend.getValue());
+                //network.sendPrivateMessage(message, userSend.getValue());
+                network.sendMessage(message);
             }
-
         } catch (IOException e) {
             e.printStackTrace();
             NetworkClient.showErrorMessage("Ошибка подключения", "Ошибка при отправке сообщения", e.getMessage());
+            logger.error("Ошибка подключения, ошибка при отправке сообщения\n" + e.getMessage(), e);
         }
 
     }
@@ -112,15 +140,17 @@ public class ChatController {
                 file.createNewFile();
             } catch (IOException e) {
                 e.printStackTrace();
+                logger.error(e.getMessage(), e);
             }
         } else {
-            try (FileOutputStream writer = new FileOutputStream(file,true)){
+            try (FileOutputStream writer = new FileOutputStream(file, true)) {
                 writer.write(timestamp.getBytes(StandardCharsets.UTF_8));
                 writer.write("\n".getBytes(StandardCharsets.UTF_8));
                 writer.write(message.getBytes(StandardCharsets.UTF_8));
                 writer.write("\n".getBytes(StandardCharsets.UTF_8));
             } catch (IOException e) {
                 e.printStackTrace();
+                logger.error(e.getMessage(), e);
             }
 
             chatHistory.appendText(timestamp);
@@ -131,23 +161,24 @@ public class ChatController {
         }
     }
 
-    public void chatHistoryDisplay()  {
-        File file = new File(String.format("ChatClient/src/main/resources/com/geekbrains/lib/chatHistory_%s.txt",network.getLogin()));
-        if(file.exists()){
-             try(BufferedReader in = new BufferedReader(new FileReader(file))){
-                 String strLine;
-                 int counter = 0;
-                while ((strLine = in.readLine()) != null ){
+    public void chatHistoryDisplay() {
+        File file = new File(String.format("ChatClient/src/main/resources/com/geekbrains/lib/chatHistory_%s.txt", network.getLogin()));
+        if (file.exists()) {
+            try (BufferedReader in = new BufferedReader(new FileReader(file))) {
+                String strLine;
+                int counter = 0;
+                while ((strLine = in.readLine()) != null) {
                     chatHistory.appendText(strLine + "\n");
                     counter++;
-                    if(counter == 100){
+                    if (counter == 100) {
                         return;
                     }
                 }
-             } catch (IOException e) {
-                 e.printStackTrace();
-             }
-        }else{
+            } catch (IOException e) {
+                e.printStackTrace();
+                logger.error(e.getMessage(), e);
+            }
+        } else {
             chatHistory.appendText("Истрия переписки отсутствует");
         }
     }

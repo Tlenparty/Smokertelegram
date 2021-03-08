@@ -19,3 +19,40 @@ java.io.EOFException: null
 	at com.geekbrains.chat.server.handler.ClientHandler.authentication(ClientHandler.java:61) ~[classes/:?]
 	at com.geekbrains.chat.server.handler.ClientHandler.lambda$handle$0(ClientHandler.java:46) ~[classes/:?]
 	at java.lang.Thread.run(Thread.java:832) [?:?]
+INFO  2021-03-06 14:48:18 [main] com.geekbrains.chat.server.MyServer (MyServer.java:38) - Сервер запущен
+INFO  2021-03-06 14:48:18 [main] com.geekbrains.chat.server.auth.BaseAuthService (BaseAuthService.java:29) - Сервер аунтификации запущен
+INFO  2021-03-06 14:48:18 [main] com.geekbrains.chat.server.MyServer (MyServer.java:55) - Ожидание пользователя
+INFO  2021-03-06 14:48:29 [main] com.geekbrains.chat.server.MyServer (MyServer.java:58) - Клиент подключился
+INFO  2021-03-06 14:48:29 [main] com.geekbrains.chat.server.MyServer (MyServer.java:55) - Ожидание пользователя
+INFO  2021-03-06 14:48:43 [Thread-0] com.geekbrains.chat.server.handler.ClientHandler (ClientHandler.java:75) - ПользовательВероника Подключился к чату
+INFO  2021-03-06 14:48:51 [main] com.geekbrains.chat.server.MyServer (MyServer.java:58) - Клиент подключился
+INFO  2021-03-06 14:48:51 [main] com.geekbrains.chat.server.MyServer (MyServer.java:55) - Ожидание пользователя
+INFO  2021-03-06 14:49:00 [Thread-1] com.geekbrains.chat.server.handler.ClientHandler (ClientHandler.java:75) - ПользовательДима Подключился к чату
+INFO  2021-03-06 14:49:24 [Thread-1] com.geekbrains.chat.server.handler.ClientHandler (ClientHandler.java:137) - Дима сменил имя на Димас
+INFO  2021-03-06 14:49:30 [Thread-0] com.geekbrains.chat.server.handler.ClientHandler (ClientHandler.java:137) - Вероника сменил имя на ВероникаКлубника
+INFO  2021-03-07 16:07:32 [main] com.geekbrains.chat.server.MyServer (MyServer.java:38) - Сервер запущен
+INFO  2021-03-07 16:07:32 [main] com.geekbrains.chat.server.auth.BaseAuthService (BaseAuthService.java:29) - Сервер аунтификации запущен
+INFO  2021-03-07 16:07:32 [main] com.geekbrains.chat.server.MyServer (MyServer.java:55) - Ожидание пользователя
+INFO  2021-03-07 16:07:43 [main] com.geekbrains.chat.server.MyServer (MyServer.java:58) - Клиент подключился
+INFO  2021-03-07 16:07:43 [main] com.geekbrains.chat.server.MyServer (MyServer.java:55) - Ожидание пользователя
+INFO  2021-03-07 16:07:51 [Thread-0] com.geekbrains.chat.server.handler.ClientHandler (ClientHandler.java:75) - ПользовательВероникаКлубника Подключился к чату
+INFO  2021-03-07 16:07:59 [main] com.geekbrains.chat.server.MyServer (MyServer.java:58) - Клиент подключился
+INFO  2021-03-07 16:07:59 [main] com.geekbrains.chat.server.MyServer (MyServer.java:55) - Ожидание пользователя
+INFO  2021-03-07 16:08:08 [Thread-1] com.geekbrains.chat.server.handler.ClientHandler (ClientHandler.java:75) - ПользовательДимас Подключился к чату
+INFO  2021-03-07 16:08:34 [main] com.geekbrains.chat.server.MyServer (MyServer.java:58) - Клиент подключился
+INFO  2021-03-07 16:08:34 [main] com.geekbrains.chat.server.MyServer (MyServer.java:55) - Ожидание пользователя
+INFO  2021-03-07 16:08:38 [Thread-2] com.geekbrains.chat.server.handler.ClientHandler (ClientHandler.java:86) - Логин или пароль неверный
+INFO  2021-03-07 16:08:39 [Thread-2] com.geekbrains.chat.server.handler.ClientHandler (ClientHandler.java:75) - ПользовательKEK Подключился к чату
+INFO  2021-03-07 16:08:51 [Thread-2] com.geekbrains.chat.server.handler.ClientHandler (ClientHandler.java:137) - KEK сменил имя на Morty
+INFO  2021-03-07 16:11:11 [main] com.geekbrains.chat.server.MyServer (MyServer.java:38) - Сервер запущен
+INFO  2021-03-07 16:11:11 [main] com.geekbrains.chat.server.auth.BaseAuthService (BaseAuthService.java:29) - Сервер аунтификации запущен
+INFO  2021-03-07 16:11:11 [main] com.geekbrains.chat.server.MyServer (MyServer.java:55) - Ожидание пользователя
+INFO  2021-03-07 16:11:17 [main] com.geekbrains.chat.server.MyServer (MyServer.java:58) - Клиент подключился
+INFO  2021-03-07 16:11:17 [main] com.geekbrains.chat.server.MyServer (MyServer.java:55) - Ожидание пользователя
+INFO  2021-03-07 16:11:23 [Thread-0] com.geekbrains.chat.server.handler.ClientHandler (ClientHandler.java:75) - ПользовательВероникаКлубника Подключился к чату
+INFO  2021-03-07 16:11:29 [main] com.geekbrains.chat.server.MyServer (MyServer.java:58) - Клиент подключился
+INFO  2021-03-07 16:11:29 [main] com.geekbrains.chat.server.MyServer (MyServer.java:55) - Ожидание пользователя
+INFO  2021-03-07 16:11:34 [Thread-1] com.geekbrains.chat.server.handler.ClientHandler (ClientHandler.java:75) - ПользовательДимас Подключился к чату
+INFO  2021-03-07 16:11:46 [main] com.geekbrains.chat.server.MyServer (MyServer.java:58) - Клиент подключился
+INFO  2021-03-07 16:11:46 [main] com.geekbrains.chat.server.MyServer (MyServer.java:55) - Ожидание пользователя
+INFO  2021-03-07 16:11:54 [Thread-2] com.geekbrains.chat.server.handler.ClientHandler (ClientHandler.java:75) - ПользовательMorty Подключился к чату

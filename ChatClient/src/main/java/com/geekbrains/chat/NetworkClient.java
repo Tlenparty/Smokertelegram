@@ -10,6 +10,8 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.Timer;
@@ -18,11 +20,11 @@ import java.util.TimerTask;
 
 public class NetworkClient extends Application {
 
-
     private Stage primaryStage;
     private Stage authStage;
     private Network network;
     private ChatController chatController;
+    private static Logger logger = LogManager.getLogger(NetworkClient.class);
 
 
     @Override
@@ -36,6 +38,7 @@ public class NetworkClient extends Application {
        if (!network.connect()) {
             System.out.println("Ошибка подключения");
             showErrorMessage("Проблемы с соединением", "", "Ошибка подключения к серверу");
+            logger.error("Проблемы с соединением, ошибка подключения к серверу");
             return;
         }
 

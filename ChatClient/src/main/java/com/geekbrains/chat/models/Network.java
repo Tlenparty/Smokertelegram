@@ -3,6 +3,8 @@ package com.geekbrains.chat.models;
 import com.geekbrains.chat.NetworkClient;
 import com.geekbrains.chat.controllers.ChatController;
 import javafx.application.Platform;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -34,8 +36,9 @@ public class Network {
     private Socket socket;
 
     private String login;
-
     private String username;
+
+    private static Logger logger = LogManager.getLogger(Network.class);
 
     public Network() {
         this(SERVER_PORT, SERVER_HOST);
@@ -53,8 +56,9 @@ public class Network {
             out = new DataOutputStream(socket.getOutputStream());
             return true;
         } catch (IOException e) {
-            System.out.println("Соединение не было установлено");
+            //System.out.println("Соединение не было установлено");
             e.printStackTrace();
+            logger.error("Соединение не было установлено\n" + e.getMessage(),e );
             return false;
         }
     }
@@ -63,6 +67,7 @@ public class Network {
     public void close() {
         try {
             socket.close();
+            sendMessage(END_CMD); // отправка команды о завершении
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -94,20 +99,21 @@ public class Network {
         Thread thread = new Thread(() -> {
             try {
                 while (true) {
-                    // Будем ждать из потока
+                    // Будем ждать из потока сообщение
                     String message = in.readUTF();
 
                     if (message.startsWith(USER_LIST)) {
                         String[] parts = message.split("\\s+");
                         userList.clear();
                         userList.addAll(Arrays.asList(parts).subList(1, parts.length));
+
                         Platform.runLater(() -> chatController.newUserList());
 
                     } else if (message.startsWith(CLIENT_MSG_PREFIX)) {
                         String[] parts = message.split("\\s+", 3);
                         String sender = parts[1];
                         String msgBody = parts[2];
-
+                        // Чтобы не было коллизии 2х потоков. Метод ставит в очередь WaitMessage -] UI
                         Platform.runLater(() -> chatController.appendMessage(String.format("%s: %s", sender, msgBody)));
 
                     } else if (message.startsWith(PRIVATE_MSG_PREFIX)) {
@@ -128,6 +134,7 @@ public class Network {
             } catch (IOException e) {
                 e.printStackTrace();
                 System.out.println("Соединение потеряно");
+                logger.error("Соединение потеряно\n" + e.getMessage());
                 NetworkClient.showErrorMessage("Ошибка подключения", "", e.getMessage());
             }
         });
@@ -151,6 +158,7 @@ public class Network {
             return response.split("\\s+", 2)[1];  // Если ошибка
         } catch (IOException e) {
             e.printStackTrace();
+            logger.error(e.getMessage(),e);
         }
         return null;
     }
@@ -170,6 +178,7 @@ public class Network {
             out.writeUTF(END_CMD);
         } catch (IOException e) {
             e.printStackTrace();
+            logger.error(e.getMessage(),e);
         }
     }
 
@@ -179,6 +188,7 @@ public class Network {
             sendMessage(String.format("%s %s %s", CHANGE_USERNAME_PREFIX, oldUsername, newUsername));
         } catch (IOException e) {
             e.printStackTrace();
+            logger.error(e.getMessage(),e);
         }
 
 
