@@ -10,6 +10,8 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.Timer;
@@ -18,11 +20,11 @@ import java.util.TimerTask;
 
 public class NetworkClient extends Application {
 
-
     private Stage primaryStage;
     private Stage authStage;
     private Network network;
     private ChatController chatController;
+    private static Logger logger = LogManager.getLogger(NetworkClient.class);
 
 
     @Override
@@ -36,6 +38,7 @@ public class NetworkClient extends Application {
        if (!network.connect()) {
             System.out.println("Ошибка подключения");
             showErrorMessage("Проблемы с соединением", "", "Ошибка подключения к серверу");
+            logger.error("Проблемы с соединением, ошибка подключения к серверу");
             return;
         }
 
@@ -90,8 +93,6 @@ public class NetworkClient extends Application {
         primaryStage.setTitle("SmokerTelegram");
         primaryStage.setScene(new Scene(root, 600, 400));
         // primaryStage.show(); По умолчанию не должно появляться
-
-        // Получим контроллер который будет работать с окном
         chatController = loader.getController();
         chatController.setNetwork(network); // для того чтобы передать network контроллеру
         // network.waitMessage(chatController);
@@ -110,7 +111,6 @@ public class NetworkClient extends Application {
         alert.setTitle(title);
         alert.setHeaderText(message);
         alert.setContentText(errorMessage);
-        //Покажем алерт
         alert.showAndWait();
 
     }
@@ -127,6 +127,7 @@ public class NetworkClient extends Application {
         primaryStage.setTitle(network.getUsername());
         chatController.setLabel(network.getUsername());
         network.waitMessage(chatController);
+        chatController.chatHistoryDisplay();
     }
 
 }

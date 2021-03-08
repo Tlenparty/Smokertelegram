@@ -1,39 +1,53 @@
 package com.geekbrains.chat.server.auth;
 
-import com.geekbrains.chat.server.User;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-import java.util.List;
+import java.sql.*;
 
 public class BaseAuthService implements AuthService {
 
-    // Сформируем коллекцию
+    private static Logger logger = LogManager.getLogger(BaseAuthService.class.getName());
+    public static Connection connection;
+    public static Statement stmt;
+    public static ResultSet rs;
 
-    public static final List<User> clients =List.of(
-            new User("user1","1111","Морти_Смит"),
-            new User("user2","2222","Isaac_Duran"),
-            new User("user3","3333", "Вероника_Клубника")
-    );
+    public static void connection() throws ClassNotFoundException, SQLException {
+        Class.forName("org.sqlite.JDBC");
+        connection = DriverManager.getConnection("jdbc:sqlite:ChatServer/src/main/resources/mainDB.db");
+        stmt = connection.createStatement();
+    }
+
+    public static void disconnect() throws SQLException {
+        connection.close();
+    }
 
 
     @Override
     public void start() {
         System.out.println("Сервер аунтификации запущен");
-
+        logger.info("Сервер аунтификации запущен");
     }
 
     @Override
-    public String getUsernameByLoginAndPassword(String login, String password) {
-        for (User client : clients) {
-            if(client.getLogin().equals(login) && client.getPassword().equals(password)){
-                return client.getUsername();
-            }
-        }
+    public String getUsernameByLoginAndPassword(String login, String password) throws SQLException, ClassNotFoundException {
+        connection();
+        rs = stmt.executeQuery(String.format("SELECT password,  username " +
+                "FROM auth WHERE login = '%s'", login));
+        String username = rs.getString("username");
+        System.out.println(rs.getString("username") + " подключился/подключилась к чату");
+        if (rs.getString("password").equals(password)) {
+            disconnect();
+            return username;
+        } else
+        disconnect();
         return null;
     }
 
     @Override
     public void close() {
         System.out.println("Сервер аунтификации завершен");
+        logger.info("Сервер аунтификации завершен");
     }
 
 }

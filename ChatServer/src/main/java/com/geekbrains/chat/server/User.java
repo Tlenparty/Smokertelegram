@@ -3,7 +3,7 @@ package com.geekbrains.chat.server;
 import java.util.Objects;
 
 public class User {
-    // Тут будет БД
+    // Тут будет БД?
 
 
     private final String login;

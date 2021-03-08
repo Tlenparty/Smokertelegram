@@ -3,6 +3,8 @@ package com.geekbrains.chat.models;
 import com.geekbrains.chat.NetworkClient;
 import com.geekbrains.chat.controllers.ChatController;
 import javafx.application.Platform;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -17,10 +19,11 @@ public class Network {
     private static final String AUTHOK_CMD_PREFIX = "/authok"; // Если аут окей
     private static final String AUTHERR_CMD_PREFIX = "/autherr"; // Если ошибка
     private static final String PRIVATE_MSG_PREFIX = "/w";  // для лс
-    private static final String CLIENT_MSG_PREFIX = "/clientMsg"; // сигнал о завершении
+    private static final String CLIENT_MSG_PREFIX = "/clientMsg"; // сигнал о завершении сообщения
     private static final String SERVER_MSG_PREFIX = "/serverMsg"; // сигнал о завершении
     private static final String END_CMD = "/end"; // сигнал о завершении
     private static final String USER_LIST = "/userList";
+    public static final String CHANGE_USERNAME_PREFIX = "/changeUsername";
     public static List<String> userList = new ArrayList<>();
 
     private static final int SERVER_PORT = 8189;
@@ -32,23 +35,20 @@ public class Network {
     private DataOutputStream out;
     private Socket socket;
 
+    private String login;
     private String username;
 
-
-
-    // Создадим конструкторы
+    private static Logger logger = LogManager.getLogger(Network.class);
 
     public Network() {
         this(SERVER_PORT, SERVER_HOST);
 
     }
-
     public Network(int serverPort, String serverHost) {
         this.port = serverPort;
         this.host = serverHost;
     }
 
-    // Метод подключает текущего клиента к сервер сокету
     public boolean connect() {
         try {
             socket = new Socket(host, port);
@@ -56,17 +56,18 @@ public class Network {
             out = new DataOutputStream(socket.getOutputStream());
             return true;
         } catch (IOException e) {
-            System.out.println("Соединение не было установлено");
+            //System.out.println("Соединение не было установлено");
             e.printStackTrace();
+            logger.error("Соединение не было установлено\n" + e.getMessage(),e );
             return false;
         }
     }
 
-    // закроем сокет
 
     public void close() {
         try {
             socket.close();
+            sendMessage(END_CMD); // отправка команды о завершении
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -74,6 +75,14 @@ public class Network {
 
     public DataInputStream getIn() {
         return in;
+    }
+
+    public String getLogin() {
+        return login;
+    }
+
+    public void setLogin(String login) {
+        this.login = login;
     }
 
     public String getUsername() {
@@ -84,29 +93,27 @@ public class Network {
         return out;
     }
 
-    // Прослушивает порт и ждет не напишут ли нам . Новый поток блокирующий.
+
     public void waitMessage(ChatController chatController) {
         // Должен создавать поток. Который блокируется
         Thread thread = new Thread(() -> {
             try {
                 while (true) {
-                    // Будем ждать из потока
+                    // Будем ждать из потока сообщение
                     String message = in.readUTF();
-
 
                     if (message.startsWith(USER_LIST)) {
                         String[] parts = message.split("\\s+");
                         userList.clear();
                         userList.addAll(Arrays.asList(parts).subList(1, parts.length));
-                        Platform.runLater(chatController::newUserList);
-                        // Вывод на экран ч/з runLater. Чтоби изменять поток UI не сразу,а указать очередь
-                        // Как только UI будет свободен и сможет вывести сообщение то мы сможем это сделать
 
-                    } else if(message.startsWith(CLIENT_MSG_PREFIX)) {
+                        Platform.runLater(() -> chatController.newUserList());
+
+                    } else if (message.startsWith(CLIENT_MSG_PREFIX)) {
                         String[] parts = message.split("\\s+", 3);
                         String sender = parts[1];
                         String msgBody = parts[2];
-
+                        // Чтобы не было коллизии 2х потоков. Метод ставит в очередь WaitMessage -] UI
                         Platform.runLater(() -> chatController.appendMessage(String.format("%s: %s", sender, msgBody)));
 
                     } else if (message.startsWith(PRIVATE_MSG_PREFIX)) {
@@ -119,7 +126,6 @@ public class Network {
                     } else if (message.startsWith(SERVER_MSG_PREFIX)) {
                         String[] parts = message.split("\\s+", 2);
                         Platform.runLater(() -> chatController.appendMessage(parts[1]));
-
                     } else {
                         Platform.runLater(() -> NetworkClient.showErrorMessage("Неизвестная команда", message, ""));
                     }
@@ -128,36 +134,31 @@ public class Network {
             } catch (IOException e) {
                 e.printStackTrace();
                 System.out.println("Соединение потеряно");
+                logger.error("Соединение потеряно\n" + e.getMessage());
                 NetworkClient.showErrorMessage("Ошибка подключения", "", e.getMessage());
             }
         });
-        thread.setDaemon(true); // фоновый поток. Хорош если закрываем приложение демон тоже закрывается
+        thread.setDaemon(true);
         thread.start();
 
 
     }
 
     public String sendAuthCommand(String login, String password) {
-        // На уровне клиента мы ждем сообщение в кот. будет 3 значения
-        // префикс об аунтификации и логин и пароль
+
         try {
-
-            // Отправляем логин и пароль на сервер
             sendMessage(String.format("%s %s %s", AUTH_CMD_PREFIX, login, password));
-
-            // Отправляем и ждем отвте от сервера
             String response = in.readUTF();
 
-            // как тока пришел ответ реагируем
-            // если начинается со строк auth
             if (response.startsWith(AUTHOK_CMD_PREFIX)) {
-                // если прошли уинтификацию. Берем ответ от сервера и делим на сост части
-                this.username = response.split("\\s+", 2)[1]; // если все ок делим на 2 части
-                return null; // Возвращаем ошибку
+                this.username = response.split("\\s+", 2)[1];
+                System.out.println(username);
+                return null; // Возвращаем null если ошибки нет.
             }
-            return response.split("\\s+", 2)[1];
+            return response.split("\\s+", 2)[1];  // Если ошибка
         } catch (IOException e) {
             e.printStackTrace();
+            logger.error(e.getMessage(),e);
         }
         return null;
     }
@@ -171,11 +172,25 @@ public class Network {
         message = PRIVATE_MSG_PREFIX + " " + recipient + " " + message;
         out.writeUTF(message);
     }
-    public void sendExitMessage(){
+
+    public void sendExitMessage() {
         try {
             out.writeUTF(END_CMD);
         } catch (IOException e) {
             e.printStackTrace();
+            logger.error(e.getMessage(),e);
         }
+    }
+
+    public void sendChangeNameCommand(String oldUsername, String newUsername) {
+
+        try {
+            sendMessage(String.format("%s %s %s", CHANGE_USERNAME_PREFIX, oldUsername, newUsername));
+        } catch (IOException e) {
+            e.printStackTrace();
+            logger.error(e.getMessage(),e);
+        }
+
+
     }
 }
