@@ -1,7 +1,6 @@
 package com.tlenparty.chat.server;
 
 import com.tlenparty.chat.server.auth.AuthService;
-import com.tlenparty.chat.server.auth.BaseAuthService;
 import com.tlenparty.chat.server.handler.ClientHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -9,112 +8,132 @@ import org.apache.logging.log4j.Logger;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
+public class MyServer implements AutoCloseable {
 
-public class MyServer {
+    private static final Logger logger = LogManager.getLogger(MyServer.class);
 
-    private static Logger logger = LogManager.getLogger(MyServer.class);
     private final ServerSocket serverSocket;
     private final AuthService authService;
-    private final List<ClientHandler> clients = new ArrayList<>();
+    private final List<ClientHandler> clients = new CopyOnWriteArrayList<>();
+    private final ExecutorService executor = Executors.newCachedThreadPool();
 
-    public List<ClientHandler> getClients() {
-        return clients;
-    }
-
-
-    public MyServer(int port) throws IOException {
-        // 3. Запускаем сервер и сервис аунтификации
+    public MyServer(int port, AuthService authService) throws IOException {
         this.serverSocket = new ServerSocket(port);
-        this.authService = new BaseAuthService();
-
+        this.authService = authService;
     }
 
-
-    public void start() throws IOException {
-        // 4 Создание пользователей, хэндлеров
-        logger.info("Сервер запущен");
-        authService.start();
-        try {
-            while (true) {
-                waitAndProcessNewClientConnection();
+    public void start() {
+        logger.info("Сервер запущен на порту {}", serverSocket.getLocalPort());
+        while (!serverSocket.isClosed()) {
+            try {
+                Socket clientSocket = serverSocket.accept();
+                logger.info("Клиент подключился: {}", clientSocket.getRemoteSocketAddress());
+                executor.execute(new ClientHandler(this, clientSocket));
+            } catch (IOException e) {
+                if (!serverSocket.isClosed()) {
+                    logger.error("Ошибка создания нового подключения", e);
+                }
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-            logger.error("Ошибка создания нового подключения",e);
-
-        } finally {
-            serverSocket.close();
         }
     }
 
-
-    private void waitAndProcessNewClientConnection() throws IOException {
-        logger.info("Ожидание пользователя");
-        Socket clientSocket = serverSocket.accept();
-        System.out.println("Клиент подключился");
-        logger.info("Клиент подключился");
-        processClientConnection(clientSocket);
-    }
-
-    private void processClientConnection(Socket clientSocket) throws IOException {
-        // Сылка на объект и на сокет
-        ClientHandler clientHandler = new ClientHandler(this, clientSocket);
-        clientHandler.handle(); // организует логику подключения. Создаст потоки процесса
-
-
+    @Override
+    public void close() {
+        try {
+            serverSocket.close();
+        } catch (IOException e) {
+            logger.warn("Ошибка закрытия серверного сокета", e);
+        }
+        clients.forEach(ClientHandler::disconnect);
+        executor.shutdownNow();
     }
 
     public AuthService getAuthService() {
         return authService;
     }
 
-    public void subscribe(ClientHandler clientHandler) {
-        // берет хэндлер и добавляет
+    public synchronized boolean subscribe(ClientHandler clientHandler) {
+        if (isUsernameBusy(clientHandler.getUsername())) {
+            return false;
+        }
         clients.add(clientHandler);
+        clientHandler.onSubscribed();
+        broadcastUserList();
+        return true;
     }
 
-    public void unSubscribe(ClientHandler clientHandler) {
-        // Отписка
-        clients.remove(clientHandler);
+    public synchronized void unSubscribe(ClientHandler clientHandler) {
+        if (clients.remove(clientHandler)) {
+            broadcastUserList();
+        }
     }
 
-    public boolean isUsernameBusy(String username) {
+    public synchronized boolean isUsernameBusy(String username) {
         for (ClientHandler client : clients) {
-            if (client.getUsername().equals(username)) {
+            if (username.equals(client.getUsername())) {
                 return true;
             }
         }
         return false;
     }
 
-    public void broadcastMessage(String message, ClientHandler sender, boolean isServerInfoMsg) throws IOException {
+    public void broadcastMessage(String message, ClientHandler sender) {
         for (ClientHandler client : clients) {
-            // Если клиент = отправитель. То игнорируем ч/з continue;
-            if (client == sender) {
-                continue;
+            if (client != sender) {
+                client.sendClientMessage(sender.getUsername(), message);
             }
-            // sender м.б. null
-            client.sendMessage(isServerInfoMsg ? null : sender.getUsername(), message);
         }
     }
 
-    public void privateMessage(String message, ClientHandler sender, String recipient, boolean isServerInfoMsg) throws IOException {
-
+    public void broadcastServerMessage(String message, ClientHandler except) {
         for (ClientHandler client : clients) {
-            if(recipient.equals(client.getUsername())) {
-                client.sendMessage(isServerInfoMsg ? null : sender.getUsername(), recipient, message);
+            if (client != except) {
+                client.sendServerMessage(message);
             }
-
         }
     }
 
+    public synchronized String changeUsername(ClientHandler client, String newUsername) throws SQLException {
+        if (newUsername.equals(client.getUsername())) {
+            return "Это уже ваше имя";
+        }
+        if (isUsernameBusy(newUsername) || authService.isUsernameTaken(newUsername)) {
+            return "Имя " + newUsername + " уже занято";
+        }
+        if (!authService.changeUsername(client.getLogin(), newUsername)) {
+            return "Учетная запись не найдена";
+        }
+        String oldUsername = client.getUsername();
+        client.onUsernameChanged(newUsername);
+        broadcastServerMessage(String.format("%s сменил имя на %s", oldUsername, newUsername), null);
+        broadcastUserList();
+        return null;
+    }
 
-    public void broadcastUserList(String userList, boolean isServerInfoMsg) throws IOException {
+    public boolean privateMessage(String message, ClientHandler sender, String recipient) {
         for (ClientHandler client : clients) {
-            client.sendUserList(isServerInfoMsg ? null : userList);
+            if (recipient.equals(client.getUsername())) {
+                client.sendPrivateMessage(sender.getUsername(), recipient, message);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public synchronized void broadcastUserList() {
+        List<String> usernames = new ArrayList<>();
+        for (ClientHandler client : clients) {
+            usernames.add(client.getUsername());
+        }
+        for (ClientHandler client : clients) {
+            client.sendUserList(usernames);
         }
     }
 }

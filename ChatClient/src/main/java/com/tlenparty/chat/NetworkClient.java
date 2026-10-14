@@ -4,6 +4,7 @@ import com.tlenparty.chat.controllers.AuthController;
 import com.tlenparty.chat.controllers.ChatController;
 import com.tlenparty.chat.models.Network;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -17,102 +18,85 @@ import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
 
-
 public class NetworkClient extends Application {
+
+    private static final long AUTH_TIMEOUT_MILLIS = 120_000;
+    private static final Logger logger = LogManager.getLogger(NetworkClient.class);
 
     private Stage primaryStage;
     private Stage authStage;
     private Network network;
     private ChatController chatController;
-    private static Logger logger = LogManager.getLogger(NetworkClient.class);
-
+    private final Timer authTimer = new Timer("auth-timeout", true);
 
     @Override
     public void start(Stage primaryStage) throws Exception {
-
         this.primaryStage = primaryStage;
-
-        // Создадим network. Пустой констурктор будет подключаться
         network = new Network();
 
-       if (!network.connect()) {
-            System.out.println("Ошибка подключения");
+        if (!network.connect()) {
+            logger.error("Ошибка подключения к серверу");
             showErrorMessage("Проблемы с соединением", "", "Ошибка подключения к серверу");
-            logger.error("Проблемы с соединением, ошибка подключения к серверу");
+            Platform.exit();
             return;
         }
 
-
-        // 1 Открываем окно с авторизацией
         openAuthWindow();
-        // 2 Создаем окно
-        сreateMainChatWindow();
+        createMainChatWindow();
+    }
 
+    @Override
+    public void stop() {
+        authTimer.cancel();
+        if (network != null) {
+            network.close();
+        }
     }
 
     private void openAuthWindow() throws IOException {
-        // Чтобы открыть окно авторизации
-        // Будет свой лоудер. Он будет обращаться auth-vewfxml
-        FXMLLoader loader = new FXMLLoader();
-        loader.setLocation(NetworkClient.class.getResource("auth-view.fxml"));
+        FXMLLoader loader = new FXMLLoader(NetworkClient.class.getResource("auth-view.fxml"));
         Parent root = loader.load();
-        // создаем сцену
         authStage = new Stage();
-
         authStage.setTitle("Authorisation");
-        authStage.initModality(Modality.WINDOW_MODAL); // задаем модальное окно
+        authStage.initModality(Modality.WINDOW_MODAL);
         authStage.initOwner(primaryStage);
-        Scene scene = new Scene(root); // Сцена для нашего окна
-        authStage.setScene(scene);
+        authStage.setScene(new Scene(root));
+        authStage.setOnCloseRequest(event -> Platform.exit());
         authStage.show();
 
-        TimerTask timeout = new TimerTask() {
+        authTimer.schedule(new TimerTask() {
             @Override
             public void run() {
-                if (!primaryStage.isShowing()) {
-                    network.close();
-                    System.exit(1);
-                }
+                Platform.runLater(() -> {
+                    if (!primaryStage.isShowing()) {
+                        logger.info("Время на авторизацию истекло");
+                        Platform.exit();
+                    }
+                });
             }
-        };
-        new Timer().schedule(timeout, 120 * 1000);
+        }, AUTH_TIMEOUT_MILLIS);
 
         AuthController authController = loader.getController();
         authController.setNetwork(network);
         authController.setNetworkClient(this);
-
-
     }
 
-    public void сreateMainChatWindow() throws java.io.IOException {
-        FXMLLoader loader = new FXMLLoader();
-        loader.setLocation(NetworkClient.class.getResource("chat-view.fxml")); // достаем вьюху
-
+    private void createMainChatWindow() throws IOException {
+        FXMLLoader loader = new FXMLLoader(NetworkClient.class.getResource("chat-view.fxml"));
         Parent root = loader.load();
-
         primaryStage.setTitle("SmokerTelegram");
         primaryStage.setScene(new Scene(root, 600, 400));
-        // primaryStage.show(); По умолчанию не должно появляться
         chatController = loader.getController();
-        chatController.setNetwork(network); // для того чтобы передать network контроллеру
-        // network.waitMessage(chatController);
-        // Обратимся к сцене
-        // primaryStage.setOnCloseRequest(windowEvent -> network.close());
-        primaryStage.setOnCloseRequest(windowEvent -> {
-            network.sendExitMessage();
-            network.close();
-        });
-
+        chatController.setNetwork(network);
+        primaryStage.setOnCloseRequest(windowEvent -> Platform.exit());
     }
 
-    // пропишем Alert
     public static void showErrorMessage(String title, String message, String errorMessage) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle(title);
         alert.setHeaderText(message);
         alert.setContentText(errorMessage);
         alert.showAndWait();
-
     }
 
     public static void main(String[] args) {
@@ -120,14 +104,12 @@ public class NetworkClient extends Application {
     }
 
     public void openMainChatWindow() {
+        authTimer.cancel();
         authStage.close();
         primaryStage.show();
-
-        // При открытии диалового окна
         primaryStage.setTitle(network.getUsername());
         chatController.setLabel(network.getUsername());
-        network.waitMessage(chatController);
         chatController.chatHistoryDisplay();
+        network.waitMessage(chatController);
     }
-
 }

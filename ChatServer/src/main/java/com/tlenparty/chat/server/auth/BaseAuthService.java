@@ -1,53 +1,56 @@
 package com.tlenparty.chat.server.auth;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 public class BaseAuthService implements AuthService {
 
-    private static Logger logger = LogManager.getLogger(BaseAuthService.class.getName());
-    public static Connection connection;
-    public static Statement stmt;
-    public static ResultSet rs;
+    private final String jdbcUrl;
+    private final PasswordHasher passwordHasher;
 
-    public static void connection() throws ClassNotFoundException, SQLException {
-        Class.forName("org.sqlite.JDBC");
-        connection = DriverManager.getConnection("jdbc:sqlite:ChatServer/src/main/resources/mainDB.db");
-        stmt = connection.createStatement();
-    }
-
-    public static void disconnect() throws SQLException {
-        connection.close();
-    }
-
-
-    @Override
-    public void start() {
-        System.out.println("Сервер аунтификации запущен");
-        logger.info("Сервер аунтификации запущен");
+    public BaseAuthService(String jdbcUrl, PasswordHasher passwordHasher) {
+        this.jdbcUrl = jdbcUrl;
+        this.passwordHasher = passwordHasher;
     }
 
     @Override
-    public String getUsernameByLoginAndPassword(String login, String password) throws SQLException, ClassNotFoundException {
-        connection();
-        rs = stmt.executeQuery(String.format("SELECT password,  username " +
-                "FROM auth WHERE login = '%s'", login));
-        String username = rs.getString("username");
-        System.out.println(rs.getString("username") + " подключился/подключилась к чату");
-        if (rs.getString("password").equals(password)) {
-            disconnect();
-            return username;
-        } else
-        disconnect();
-        return null;
+    public String getUsernameByLoginAndPassword(String login, String password) throws SQLException {
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT password, username FROM auth WHERE login = ?")) {
+            statement.setString(1, login);
+            try (ResultSet rs = statement.executeQuery()) {
+                if (!rs.next()) {
+                    return null;
+                }
+                return passwordHasher.matches(password, rs.getString("password")) ? rs.getString("username") : null;
+            }
+        }
     }
 
     @Override
-    public void close() {
-        System.out.println("Сервер аунтификации завершен");
-        logger.info("Сервер аунтификации завершен");
+    public boolean isUsernameTaken(String username) throws SQLException {
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT 1 FROM auth WHERE username = ?")) {
+            statement.setString(1, username);
+            try (ResultSet rs = statement.executeQuery()) {
+                return rs.next();
+            }
+        }
     }
 
+    @Override
+    public boolean changeUsername(String login, String newUsername) throws SQLException {
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(
+                     "UPDATE auth SET username = ? WHERE login = ?")) {
+            statement.setString(1, newUsername);
+            statement.setString(2, login);
+            return statement.executeUpdate() == 1;
+        }
+    }
 }

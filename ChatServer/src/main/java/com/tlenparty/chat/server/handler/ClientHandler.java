@@ -1,179 +1,214 @@
 package com.tlenparty.chat.server.handler;
 
 import com.tlenparty.chat.server.MyServer;
-import com.tlenparty.chat.server.auth.AuthService;
-import com.tlenparty.chat.server.auth.BaseAuthService;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.sql.SQLException;
+import java.util.List;
 
-public class ClientHandler {
-    private static Logger logger = LogManager.getLogger(ClientHandler.class);
-    private static final String AUTH_CMD_PREFIX = "/auth";
-    private static final String AUTHOK_CMD_PREFIX = "/authok"; // Если аут окей
-    private static final String AUTHERR_CMD_PREFIX = "/autherr"; // Если ошибка
-    private static final String PRIVATE_MSG_PREFIX = "/w";  // для лс
-    private static final String CLIENT_MSG_PREFIX = "/clientMsg"; // сигнал о завершении
-    private static final String SERVER_MSG_PREFIX = "/serverMsg"; // сигнал о завершении
-    private static final String END_CMD = "/end"; // сигнал о завершении
-    public static final String CHANGE_USERNAME_PREFIX = "/changeUsername";
-    private static final String USER_LIST = "/userList";
+public class ClientHandler implements Runnable {
 
+    private static final Logger logger = LogManager.getLogger(ClientHandler.class);
+
+    private static final String AUTH_CMD = "/auth";
+    private static final String AUTHOK_CMD = "/authok";
+    private static final String AUTHERR_CMD = "/autherr";
+    private static final String PUBLIC_MSG_CMD = "/msg";
+    private static final String PRIVATE_MSG_CMD = "/w";
+    private static final String PRIVATE_DELIVERY_CMD = "/privateMsg";
+    private static final String CLIENT_MSG_CMD = "/clientMsg";
+    private static final String SERVER_MSG_CMD = "/serverMsg";
+    private static final String END_CMD = "/end";
+    private static final String CHANGE_USERNAME_CMD = "/changeUsername";
+    private static final String CHANGE_USERNAME_OK_CMD = "/changeUsernameOk";
+    private static final String CHANGE_USERNAME_ERR_CMD = "/changeUsernameErr";
+    private static final String USER_LIST_CMD = "/userList";
+
+    private static final int AUTH_TIMEOUT_MILLIS = 120_000;
+    private static final int MAX_USERNAME_LENGTH = 32;
 
     private final MyServer myServer;
     private final Socket clientSocket;
-    private DataInputStream in;
     private DataOutputStream out;
-    //  private static Statement stmt;
-    private String username;
+    private volatile String login;
+    private volatile String username;
 
-    // 6  Принимает myServer и clientSocket
     public ClientHandler(MyServer myServer, Socket clientSocket) {
         this.myServer = myServer;
         this.clientSocket = clientSocket;
     }
 
-    public void handle() throws IOException {
-        in = new DataInputStream(clientSocket.getInputStream());
-        out = new DataOutputStream(clientSocket.getOutputStream());
-        new Thread(() -> {
-            try {
-                authentication();
-                readMessage();
-            } catch (IOException e) {
-                e.printStackTrace();
-                logger.error(e.getMessage(), e);
-            } catch (SQLException | ClassNotFoundException throwables) {
-                logger.error(throwables.getMessage(), throwables);
+    @Override
+    public void run() {
+        try (Socket socket = clientSocket;
+             DataInputStream in = new DataInputStream(socket.getInputStream());
+             DataOutputStream output = new DataOutputStream(socket.getOutputStream())) {
+            this.out = output;
+            socket.setSoTimeout(AUTH_TIMEOUT_MILLIS);
+            if (authenticate(in)) {
+                socket.setSoTimeout(0);
+                readMessages(in);
             }
-
-        }).start();
-    }
-
-    private void authentication() throws IOException, SQLException, ClassNotFoundException {
-
-        while (true) {
-            String message = in.readUTF();
-            if (message.startsWith(AUTH_CMD_PREFIX)) {
-                String[] parts = message.split("\\s+", 3);
-                String login = parts[1];
-                String password = parts[2];
-                AuthService authService = myServer.getAuthService();
-                username = authService.getUsernameByLoginAndPassword(login, password);
-                if (username != null) {
-                    if (myServer.isUsernameBusy(username)) {
-                        out.writeUTF(String.format("%s %s", AUTHERR_CMD_PREFIX, "Логин уже используется"));
-                        logger.info("Логин уже используется");
-                    }
-                    out.writeUTF(String.format("%s %s", AUTHOK_CMD_PREFIX, username));
-                    myServer.broadcastMessage(String.format(">>>>> %s подключился к чату", username), this, true);
-                    logger.info("Пользователь" + username + " Подключился к чату");
-                    myServer.subscribe(this);
-                    String userList = USER_LIST;
-                    for (ClientHandler client : myServer.getClients()) {
-                        userList = userList + " " + client.getUsername();
-                    }
-                    myServer.broadcastUserList(userList, false);
-                    break;
-                } else {
-                    out.writeUTF(String.format("%s %s", AUTHERR_CMD_PREFIX, "Логин или пароль не соответсвтуют" +
-                            " действительности"));
-                    logger.info("Логин или пароль неверный");
-                }
-            } else {
-                out.writeUTF(String.format("%s %s", AUTHERR_CMD_PREFIX, "Ошибка авторизации"));
-                logger.info("Ошибка авторизации");
-            }
-        }
-    }
-
-
-    public synchronized void sendUserList(String userLists) throws IOException {
-        out.writeUTF(String.format("%s", userLists));
-    }
-
-
-    private void readMessage() throws IOException {
-        while (true) {
-            String message = in.readUTF();
-            String[] parts;
-            String recipient;
-            System.out.println("message | " + username + ":" + message);
-
-            if (message.startsWith(END_CMD)) {
+        } catch (SocketTimeoutException e) {
+            logger.info("Клиент не авторизовался вовремя");
+        } catch (EOFException | SocketException e) {
+            logger.info("Клиент {} отключился", username);
+        } catch (IOException e) {
+            logger.error("Ошибка соединения с клиентом {}", username, e);
+        } finally {
+            if (username != null) {
                 myServer.unSubscribe(this);
-                String userList = USER_LIST;
-
-                for (ClientHandler client : myServer.getClients()) {
-                    userList = userList + " " + client.getUsername();
-                }
-                myServer.broadcastUserList(userList, false);
-                myServer.broadcastUserList(userList, false);
-                return;
-
-            } else if (message.startsWith(PRIVATE_MSG_PREFIX)) {
-                parts = message.split("\\s+", 3);
-                recipient = parts[1];
-                message = parts[2];
-                myServer.privateMessage(message, this, recipient, false);
-            } else if (message.startsWith(CHANGE_USERNAME_PREFIX)) {
-                parts = message.split("\\s+", 3);
-                String oldUsername = parts[1];
-                String newUsername = parts[2];
-                try {
-                    BaseAuthService.connection();
-                    int result = BaseAuthService.stmt.executeUpdate(String.format("UPDATE auth " +
-                                    "SET username = '%s' " +
-                                    "WHERE username = '%s'",
-                            newUsername, oldUsername));
-                    System.out.println("Имя сменилось");
-                    myServer.broadcastMessage(String.format("%s >>>>>>>> сменил имя на %s", oldUsername, newUsername),
-                            this, true);
-                    logger.info(oldUsername + " сменил имя на " + newUsername);
-                    System.out.println(result);
-                    BaseAuthService.disconnect();
-                } catch (ClassNotFoundException | SQLException e) {
-                    e.printStackTrace();
-                    logger.error(e.getMessage(), e);
-                }
-                String userList = USER_LIST;
-                this.username = newUsername;
-                for (ClientHandler client : myServer.getClients()) {
-                    userList = userList + " " + client.getUsername();
-                }
-                myServer.broadcastUserList(userList, false);
-
-
-            } else {
-                myServer.broadcastMessage(message, this, false);
+                myServer.broadcastServerMessage(username + " покинул чат", this);
             }
         }
+    }
+
+    private boolean authenticate(DataInputStream in) throws IOException {
+        while (true) {
+            String[] parts = in.readUTF().split("\\s+", 3);
+            if (END_CMD.equals(parts[0])) {
+                return false;
+            }
+            if (!AUTH_CMD.equals(parts[0]) || parts.length < 3) {
+                write(AUTHERR_CMD + " Ошибка авторизации");
+                continue;
+            }
+            String candidateLogin = parts[1];
+            String candidateUsername;
+            try {
+                candidateUsername = myServer.getAuthService().getUsernameByLoginAndPassword(candidateLogin, parts[2]);
+            } catch (SQLException e) {
+                logger.error("Ошибка доступа к базе пользователей", e);
+                write(AUTHERR_CMD + " Сервис авторизации недоступен");
+                continue;
+            }
+            if (candidateUsername == null) {
+                write(AUTHERR_CMD + " Логин или пароль не соответствуют действительности");
+                logger.info("Неверный логин или пароль для {}", candidateLogin);
+                continue;
+            }
+            this.login = candidateLogin;
+            this.username = candidateUsername;
+            if (!myServer.subscribe(this)) {
+                this.login = null;
+                this.username = null;
+                write(AUTHERR_CMD + " Учетная запись уже используется");
+                continue;
+            }
+            myServer.broadcastServerMessage(candidateUsername + " подключился к чату", this);
+            logger.info("Пользователь {} подключился к чату", candidateUsername);
+            return true;
+        }
+    }
+
+    private void readMessages(DataInputStream in) throws IOException {
+        while (true) {
+            String message = in.readUTF();
+            String[] parts = message.split("\\s+", 2);
+            String command = parts[0];
+            String rest = parts.length > 1 ? parts[1] : "";
+
+            if (END_CMD.equals(command)) {
+                return;
+            } else if (PUBLIC_MSG_CMD.equals(command) && !rest.isBlank()) {
+                myServer.broadcastMessage(rest, this);
+            } else if (PRIVATE_MSG_CMD.equals(command)) {
+                handlePrivateMessage(rest);
+            } else if (CHANGE_USERNAME_CMD.equals(command)) {
+                handleChangeUsername(rest.trim());
+            } else {
+                sendServerMessage("Неизвестная команда: " + command);
+            }
+        }
+    }
+
+    private void handlePrivateMessage(String rest) {
+        String[] parts = rest.split("\\s+", 2);
+        if (parts.length < 2 || parts[1].isBlank()) {
+            sendServerMessage("Формат личного сообщения: /w <получатель> <текст>");
+            return;
+        }
+        String recipient = parts[0];
+        if (recipient.equals(username)) {
+            sendServerMessage("Нельзя отправить личное сообщение самому себе");
+        } else if (!myServer.privateMessage(parts[1], this, recipient)) {
+            sendServerMessage("Пользователь " + recipient + " не в сети");
+        }
+    }
+
+    private void handleChangeUsername(String newUsername) {
+        if (newUsername.isEmpty() || newUsername.length() > MAX_USERNAME_LENGTH || newUsername.matches(".*\\s.*")) {
+            write(CHANGE_USERNAME_ERR_CMD + " Имя должно быть одним словом длиной до " + MAX_USERNAME_LENGTH + " символов");
+            return;
+        }
+        try {
+            String error = myServer.changeUsername(this, newUsername);
+            if (error != null) {
+                write(CHANGE_USERNAME_ERR_CMD + " " + error);
+            }
+        } catch (SQLException e) {
+            logger.error("Ошибка смены имени", e);
+            write(CHANGE_USERNAME_ERR_CMD + " Ошибка базы данных");
+        }
+    }
+
+    public void onSubscribed() {
+        write(AUTHOK_CMD + " " + username);
+    }
+
+    public void onUsernameChanged(String newUsername) {
+        logger.info("{} сменил имя на {}", username, newUsername);
+        this.username = newUsername;
+        write(CHANGE_USERNAME_OK_CMD + " " + newUsername);
+    }
+
+    public String getLogin() {
+        return login;
     }
 
     public String getUsername() {
         return username;
     }
 
+    public void sendClientMessage(String sender, String message) {
+        write(String.format("%s %s %s", CLIENT_MSG_CMD, sender, message));
+    }
 
-    public synchronized void sendMessage(String sender, String message) throws IOException {
-        if (sender == null) {
-            out.writeUTF(String.format("%s %s", SERVER_MSG_PREFIX, message));
-        } else {
-            out.writeUTF(String.format("%s %s %s ", CLIENT_MSG_PREFIX, sender, message));
+    public void sendPrivateMessage(String sender, String recipient, String message) {
+        write(String.format("%s %s %s %s", PRIVATE_DELIVERY_CMD, sender, recipient, message));
+    }
+
+    public void sendServerMessage(String message) {
+        write(SERVER_MSG_CMD + " " + message);
+    }
+
+    public void sendUserList(List<String> usernames) {
+        write(usernames.isEmpty() ? USER_LIST_CMD : USER_LIST_CMD + " " + String.join(" ", usernames));
+    }
+
+    public void disconnect() {
+        try {
+            clientSocket.close();
+        } catch (IOException e) {
+            logger.warn("Ошибка закрытия сокета", e);
         }
     }
 
-    public synchronized void sendMessage(String sender, String recipient, String message) throws IOException {
-        if (sender == null) {
-            out.writeUTF(String.format("%s %s", SERVER_MSG_PREFIX, message));
-        } else {
-            out.writeUTF(String.format("%s %s %s %s", PRIVATE_MSG_PREFIX, sender, recipient, message));
+    private synchronized void write(String message) {
+        try {
+            out.writeUTF(message);
+            out.flush();
+        } catch (IOException e) {
+            logger.debug("Не удалось отправить сообщение клиенту {}: {}", username, e.getMessage());
+            disconnect();
         }
     }
-
 }

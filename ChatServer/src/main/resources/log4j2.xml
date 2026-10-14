@@ -2,11 +2,11 @@
 
 <Configuration xmlns="http://logging.apache.org/log4j/2.0/config">
     <Properties>
-        <Property name="basePath">ChatServer/src/main/resources/logs</Property>
+        <Property name="basePath">${sys:chat.log.dir:-logs}</Property>
     </Properties>
 
     <Appenders>
-        <File name="FILE" fileName="${basePath}/logfile.log" append="true">
+        <File name="FILE" fileName="${basePath}/server.log" append="true">
             <PatternLayout pattern="%-5p %d{yyyy-MM-dd HH:mm:ss} [%t] %C (%F:%L) - %m%n" />
         </File>
 

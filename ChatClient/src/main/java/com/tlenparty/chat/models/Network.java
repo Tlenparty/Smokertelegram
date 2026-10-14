@@ -10,24 +10,27 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 public class Network {
-    private static final String AUTH_CMD_PREFIX = "/auth";
-    private static final String AUTHOK_CMD_PREFIX = "/authok"; // Если аут окей
-    private static final String AUTHERR_CMD_PREFIX = "/autherr"; // Если ошибка
-    private static final String PRIVATE_MSG_PREFIX = "/w";  // для лс
-    private static final String CLIENT_MSG_PREFIX = "/clientMsg"; // сигнал о завершении сообщения
-    private static final String SERVER_MSG_PREFIX = "/serverMsg"; // сигнал о завершении
-    private static final String END_CMD = "/end"; // сигнал о завершении
-    private static final String USER_LIST = "/userList";
-    public static final String CHANGE_USERNAME_PREFIX = "/changeUsername";
-    public static List<String> userList = new ArrayList<>();
+    private static final String AUTH_CMD = "/auth";
+    private static final String AUTHOK_CMD = "/authok";
+    private static final String PUBLIC_MSG_CMD = "/msg";
+    private static final String PRIVATE_MSG_CMD = "/w";
+    private static final String PRIVATE_DELIVERY_CMD = "/privateMsg";
+    private static final String CLIENT_MSG_CMD = "/clientMsg";
+    private static final String SERVER_MSG_CMD = "/serverMsg";
+    private static final String END_CMD = "/end";
+    private static final String USER_LIST_CMD = "/userList";
+    private static final String CHANGE_USERNAME_CMD = "/changeUsername";
+    private static final String CHANGE_USERNAME_OK_CMD = "/changeUsernameOk";
+    private static final String CHANGE_USERNAME_ERR_CMD = "/changeUsernameErr";
 
     private static final int SERVER_PORT = 8189;
     private static final String SERVER_HOST = "localhost";
+
+    private static final Logger logger = LogManager.getLogger(Network.class);
 
     private final int port;
     private final String host;
@@ -36,14 +39,13 @@ public class Network {
     private Socket socket;
 
     private String login;
-    private String username;
-
-    private static Logger logger = LogManager.getLogger(Network.class);
+    private volatile String username;
+    private volatile boolean closed;
 
     public Network() {
-        this(SERVER_PORT, SERVER_HOST);
-
+        this(Integer.getInteger("chat.port", SERVER_PORT), System.getProperty("chat.host", SERVER_HOST));
     }
+
     public Network(int serverPort, String serverHost) {
         this.port = serverPort;
         this.host = serverHost;
@@ -56,25 +58,27 @@ public class Network {
             out = new DataOutputStream(socket.getOutputStream());
             return true;
         } catch (IOException e) {
-            //System.out.println("Соединение не было установлено");
-            e.printStackTrace();
-            logger.error("Соединение не было установлено\n" + e.getMessage(),e );
+            logger.error("Соединение не было установлено", e);
             return false;
         }
     }
 
-
     public void close() {
+        if (closed || socket == null) {
+            return;
+        }
+        closed = true;
+        try {
+            out.writeUTF(END_CMD);
+            out.flush();
+        } catch (IOException e) {
+            logger.debug("Не удалось отправить команду завершения", e);
+        }
         try {
             socket.close();
-            sendMessage(END_CMD); // отправка команды о завершении
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.warn("Ошибка закрытия сокета", e);
         }
-    }
-
-    public DataInputStream getIn() {
-        return in;
     }
 
     public String getLogin() {
@@ -89,108 +93,86 @@ public class Network {
         return username;
     }
 
-    public DataOutputStream getOut() {
-        return out;
-    }
-
-
     public void waitMessage(ChatController chatController) {
-        // Должен создавать поток. Который блокируется
         Thread thread = new Thread(() -> {
             try {
                 while (true) {
-                    // Будем ждать из потока сообщение
-                    String message = in.readUTF();
-
-                    if (message.startsWith(USER_LIST)) {
-                        String[] parts = message.split("\\s+");
-                        userList.clear();
-                        userList.addAll(Arrays.asList(parts).subList(1, parts.length));
-
-                        Platform.runLater(() -> chatController.newUserList());
-
-                    } else if (message.startsWith(CLIENT_MSG_PREFIX)) {
-                        String[] parts = message.split("\\s+", 3);
-                        String sender = parts[1];
-                        String msgBody = parts[2];
-                        // Чтобы не было коллизии 2х потоков. Метод ставит в очередь WaitMessage -] UI
-                        Platform.runLater(() -> chatController.appendMessage(String.format("%s: %s", sender, msgBody)));
-
-                    } else if (message.startsWith(PRIVATE_MSG_PREFIX)) {
-                        String[] parts = message.split("\\s+", 4);
-                        String sender = parts[1];
-                        String msgBody = parts[3];
-
-                        Platform.runLater(() -> chatController.appendMessage(String.format("%s: %s", sender, msgBody)));
-
-                    } else if (message.startsWith(SERVER_MSG_PREFIX)) {
-                        String[] parts = message.split("\\s+", 2);
-                        Platform.runLater(() -> chatController.appendMessage(parts[1]));
-                    } else {
-                        Platform.runLater(() -> NetworkClient.showErrorMessage("Неизвестная команда", message, ""));
-                    }
+                    dispatch(in.readUTF(), chatController);
                 }
-
             } catch (IOException e) {
-                e.printStackTrace();
-                System.out.println("Соединение потеряно");
-                logger.error("Соединение потеряно\n" + e.getMessage());
-                NetworkClient.showErrorMessage("Ошибка подключения", "", e.getMessage());
+                if (!closed) {
+                    logger.error("Соединение потеряно", e);
+                    Platform.runLater(() -> NetworkClient.showErrorMessage("Ошибка подключения", "Соединение потеряно", e.getMessage()));
+                }
             }
         });
         thread.setDaemon(true);
         thread.start();
+    }
 
+    private void dispatch(String message, ChatController chatController) {
+        String[] head = message.split("\\s+", 2);
+        String command = head[0];
+        String rest = head.length > 1 ? head[1] : "";
 
+        if (USER_LIST_CMD.equals(command)) {
+            List<String> users = rest.isBlank() ? List.of() : Arrays.asList(rest.trim().split("\\s+"));
+            Platform.runLater(() -> chatController.updateUserList(users));
+        } else if (CLIENT_MSG_CMD.equals(command)) {
+            String[] parts = rest.split("\\s+", 2);
+            String text = parts.length > 1 ? parts[1] : "";
+            Platform.runLater(() -> chatController.appendMessage(String.format("%s: %s", parts[0], text)));
+        } else if (PRIVATE_DELIVERY_CMD.equals(command)) {
+            String[] parts = rest.split("\\s+", 3);
+            String text = parts.length > 2 ? parts[2] : "";
+            Platform.runLater(() -> chatController.appendMessage(String.format("%s (лично): %s", parts[0], text)));
+        } else if (SERVER_MSG_CMD.equals(command)) {
+            Platform.runLater(() -> chatController.appendMessage(rest));
+        } else if (CHANGE_USERNAME_OK_CMD.equals(command)) {
+            username = rest.trim();
+            Platform.runLater(() -> chatController.onUsernameChanged(username));
+        } else if (CHANGE_USERNAME_ERR_CMD.equals(command)) {
+            Platform.runLater(() -> chatController.onUsernameChangeRejected(rest));
+        } else {
+            logger.warn("Неизвестная команда от сервера: {}", message);
+        }
     }
 
     public String sendAuthCommand(String login, String password) {
-
         try {
-            sendMessage(String.format("%s %s %s", AUTH_CMD_PREFIX, login, password));
+            sendRaw(String.format("%s %s %s", AUTH_CMD, login, password));
             String response = in.readUTF();
-
-            if (response.startsWith(AUTHOK_CMD_PREFIX)) {
-                this.username = response.split("\\s+", 2)[1];
-                System.out.println(username);
-                return null; // Возвращаем null если ошибки нет.
+            String[] parts = response.split("\\s+", 2);
+            String payload = parts.length > 1 ? parts[1] : "";
+            if (AUTHOK_CMD.equals(parts[0])) {
+                this.username = payload;
+                return null;
             }
-            return response.split("\\s+", 2)[1];  // Если ошибка
+            return payload.isEmpty() ? "Ошибка авторизации" : payload;
         } catch (IOException e) {
-            e.printStackTrace();
-            logger.error(e.getMessage(),e);
+            logger.error("Ошибка авторизации", e);
+            return "Нет связи с сервером: " + e.getMessage();
         }
-        return null;
     }
 
     public void sendMessage(String message) throws IOException {
-        out.writeUTF(message);
+        sendRaw(PUBLIC_MSG_CMD + " " + message);
     }
-
 
     public void sendPrivateMessage(String message, String recipient) throws IOException {
-        message = PRIVATE_MSG_PREFIX + " " + recipient + " " + message;
+        sendRaw(PRIVATE_MSG_CMD + " " + recipient + " " + message);
+    }
+
+    public void sendChangeNameCommand(String newUsername) {
+        try {
+            sendRaw(CHANGE_USERNAME_CMD + " " + newUsername);
+        } catch (IOException e) {
+            logger.error("Ошибка смены имени", e);
+        }
+    }
+
+    private synchronized void sendRaw(String message) throws IOException {
         out.writeUTF(message);
-    }
-
-    public void sendExitMessage() {
-        try {
-            out.writeUTF(END_CMD);
-        } catch (IOException e) {
-            e.printStackTrace();
-            logger.error(e.getMessage(),e);
-        }
-    }
-
-    public void sendChangeNameCommand(String oldUsername, String newUsername) {
-
-        try {
-            sendMessage(String.format("%s %s %s", CHANGE_USERNAME_PREFIX, oldUsername, newUsername));
-        } catch (IOException e) {
-            e.printStackTrace();
-            logger.error(e.getMessage(),e);
-        }
-
-
+        out.flush();
     }
 }

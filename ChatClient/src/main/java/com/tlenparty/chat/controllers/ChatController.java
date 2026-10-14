@@ -1,24 +1,38 @@
 package com.tlenparty.chat.controllers;
 
-
 import com.tlenparty.chat.NetworkClient;
 import com.tlenparty.chat.models.Network;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
-import javafx.scene.control.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.Hyperlink;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
+import javafx.scene.control.MultipleSelectionModel;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
 import javafx.scene.input.MouseEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.*;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-
 public class ChatController {
+
+    private static final String EVERYONE = "Всем";
+    private static final int HISTORY_LINES = 100;
+    private static final Logger logger = LogManager.getLogger(ChatController.class);
+
     @FXML
     private TextArea chatHistory;
 
@@ -43,14 +57,10 @@ public class ChatController {
     @FXML
     private Hyperlink changeNameLinkID;
 
-
     private Network network;
     private String selectedRecipient;
+    private List<String> onlineUsers = List.of();
 
-    private List<String> user = new ArrayList<>();
-    private static Logger logger = LogManager.getLogger(ChatController.class);
-
-    // NetworkChat(эко клиент) знает network.
     public void setNetwork(Network network) {
         this.network = network;
     }
@@ -61,17 +71,10 @@ public class ChatController {
 
     @FXML
     public void initialize() {
-        //userList.setItems(FXCollections.observableArrayList(NetworkClient.USERS_TEST_DATA));
-        user.add(0, "Всем");
-        user.addAll(Network.userList);
-        user.remove(usernameTitle.getText());
-        userSend.setItems(FXCollections.observableArrayList(user));
-        userSend.setValue(user.get(0));
-        usersList.setItems(FXCollections.observableArrayList(Network.userList));
-        textField.setOnAction(event -> ChatController.this.sendMessage());
-        sendButton.setOnAction(event -> ChatController.this.sendMessage());
+        updateUserList(List.of());
+        textField.setOnAction(event -> sendMessage());
+        sendButton.setOnAction(event -> sendMessage());
 
-        // Отправка сообщения по нажатию на пользователя.
         usersList.setCellFactory(lv -> {
             MultipleSelectionModel<String> selectionModel = usersList.getSelectionModel();
             ListCell<String> cell = new ListCell<>();
@@ -94,124 +97,103 @@ public class ChatController {
         });
     }
 
-    public void newUserList() {
-        user.clear();
-        user.add(0, "Всем");
-        user.addAll(Network.userList);
-        user.remove(usernameTitle.getText());
-        userSend.setItems(FXCollections.observableArrayList(user));
-        userSend.setValue(user.get(0));
-        usersList.setItems(FXCollections.observableArrayList(Network.userList));
+    public void updateUserList(List<String> users) {
+        onlineUsers = List.copyOf(users);
+        String ownName = usernameTitle.getText();
+        List<String> recipients = new ArrayList<>();
+        recipients.add(EVERYONE);
+        for (String user : onlineUsers) {
+            if (!user.equals(ownName)) {
+                recipients.add(user);
+            }
+        }
+        userSend.setItems(FXCollections.observableArrayList(recipients));
+        userSend.setValue(EVERYONE);
+        usersList.setItems(FXCollections.observableArrayList(onlineUsers));
+        if (selectedRecipient != null && !recipients.contains(selectedRecipient)) {
+            selectedRecipient = null;
+        }
     }
 
-    // Отправка сообщения на нетворк + вывод на экран
     private void sendMessage() {
         String message = textField.getText();
-        appendMessage("Я: " + message); // добавляет текст.
-        textField.clear();
-
-        try {
-            // Отправляем сообщение на сервер
-            // network.sendMessage(message); // get.Out().writeUTF(message);
-/*            if (userSend.getValue().equals("Всем")) {
-                network.sendMessage(message);
-            } */
-            if (selectedRecipient != null) {
-                network.sendPrivateMessage(message, selectedRecipient);
-            } else {
-                //network.sendPrivateMessage(message, userSend.getValue());
-                network.sendMessage(message);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-            NetworkClient.showErrorMessage("Ошибка подключения", "Ошибка при отправке сообщения", e.getMessage());
-            logger.error("Ошибка подключения, ошибка при отправке сообщения\n" + e.getMessage(), e);
+        if (message.isBlank()) {
+            return;
         }
-
+        String recipient = selectedRecipient != null ? selectedRecipient : userSend.getValue();
+        boolean isPrivate = recipient != null && !EVERYONE.equals(recipient);
+        try {
+            if (isPrivate) {
+                network.sendPrivateMessage(message, recipient);
+                appendMessage(String.format("Я → %s: %s", recipient, message));
+            } else {
+                network.sendMessage(message);
+                appendMessage("Я: " + message);
+            }
+            textField.clear();
+        } catch (IOException e) {
+            logger.error("Ошибка при отправке сообщения", e);
+            NetworkClient.showErrorMessage("Ошибка подключения", "Ошибка при отправке сообщения", e.getMessage());
+        }
     }
 
-
-    public void appendMessage(String message) { // вывод на экран
-
+    public void appendMessage(String message) {
         String timestamp = DateFormat.getInstance().format(new Date());
-        File file = new File(String.format("ChatClient/src/main/resources/com/tlenparty/lib/chatHistory_%s.txt", network.getLogin()));
-        if (!file.exists()) {
-            try {
-                file.createNewFile();
-            } catch (IOException e) {
-                e.printStackTrace();
-                logger.error(e.getMessage(), e);
-            }
-        } else {
-            try (FileOutputStream writer = new FileOutputStream(file, true)) {
-                writer.write(timestamp.getBytes(StandardCharsets.UTF_8));
-                writer.write("\n".getBytes(StandardCharsets.UTF_8));
-                writer.write(message.getBytes(StandardCharsets.UTF_8));
-                writer.write("\n".getBytes(StandardCharsets.UTF_8));
-            } catch (IOException e) {
-                e.printStackTrace();
-                logger.error(e.getMessage(), e);
-            }
-
-            chatHistory.appendText(timestamp);
-            chatHistory.appendText(System.lineSeparator());
-            chatHistory.appendText(message);
-            chatHistory.appendText(System.lineSeparator());
-            chatHistory.appendText(System.lineSeparator());
+        String entry = timestamp + System.lineSeparator() + message + System.lineSeparator();
+        try {
+            Path file = historyFile();
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, entry, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            logger.error("Не удалось сохранить историю", e);
         }
+        chatHistory.appendText(entry + System.lineSeparator());
     }
 
     public void chatHistoryDisplay() {
-        File file = new File(String.format("ChatClient/src/main/resources/com/tlenparty/lib/chatHistory_%s.txt", network.getLogin()));
-        if (file.exists()) {
-            try (BufferedReader in = new BufferedReader(new FileReader(file))) {
-                String strLine;
-                int counter = 0;
-                while ((strLine = in.readLine()) != null) {
-                    chatHistory.appendText(strLine + "\n");
-                    counter++;
-                    if (counter == 100) {
-                        return;
-                    }
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-                logger.error(e.getMessage(), e);
+        Path file = historyFile();
+        if (!Files.exists(file)) {
+            chatHistory.appendText("История переписки отсутствует" + System.lineSeparator());
+            return;
+        }
+        try {
+            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+            for (String line : lines.subList(Math.max(0, lines.size() - HISTORY_LINES), lines.size())) {
+                chatHistory.appendText(line + System.lineSeparator());
             }
-        } else {
-            chatHistory.appendText("Истрия переписки отсутствует");
+        } catch (IOException e) {
+            logger.error("Не удалось прочитать историю", e);
         }
     }
 
-
-    public void setUsernameTitle(String username) {
-
-
+    private Path historyFile() {
+        String dir = System.getProperty("chat.history.dir", Path.of(System.getProperty("user.home"), ".smokertelegram").toString());
+        return Path.of(dir, String.format("chatHistory_%s.txt", network.getLogin()));
     }
 
-    // смена ника
     public void openChangeNameField() {
         changeNameFieldID.setVisible(true);
         changeNameLinkID.setVisible(false);
         changeNameFieldID.setText(usernameTitle.getText());
-
     }
 
-
-    // Отправка нового никнейма на нетворк
     public void updateUsername() {
-        String oldUsername = network.getUsername();
-        String newUsername = changeNameFieldID.getText();
-        if (newUsername.isBlank()) {
-            NetworkClient.showErrorMessage("Ошибка смены имени", "Ошибка ввода ", "Поле не должно " +
-                    "быть пустым ");
+        String newUsername = changeNameFieldID.getText().trim();
+        if (newUsername.isEmpty() || newUsername.matches(".*\\s.*")) {
+            NetworkClient.showErrorMessage("Ошибка смены имени", "Ошибка ввода", "Имя должно быть одним словом без пробелов");
             return;
         }
-        usernameTitle.setText(changeNameFieldID.getText());
-        network.sendChangeNameCommand(oldUsername, newUsername);
+        network.sendChangeNameCommand(newUsername);
         changeNameLinkID.setVisible(true);
         changeNameFieldID.setVisible(false);
+    }
 
+    public void onUsernameChanged(String newUsername) {
+        usernameTitle.setText(newUsername);
+        updateUserList(onlineUsers);
+    }
 
+    public void onUsernameChangeRejected(String reason) {
+        NetworkClient.showErrorMessage("Ошибка смены имени", "Сервер отклонил смену имени", reason);
     }
 }
