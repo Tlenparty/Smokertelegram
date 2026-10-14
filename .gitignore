@@ -12,10 +12,13 @@ target/
 *.class
 *.jar
 
-# Runtime data: logs and per-user chat history
+# Runtime data: logs, per-user chat history, SQLite temp files
 *.log
 logs/
 chatHistory_*.txt
+*.db-journal
+*.db-wal
+*.db-shm
 
 # OS junk
 .DS_Store
