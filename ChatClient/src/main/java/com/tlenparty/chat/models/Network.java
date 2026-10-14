@@ -1,7 +1,7 @@
-package com.geekbrains.chat.models;
+package com.tlenparty.chat.models;
 
-import com.geekbrains.chat.NetworkClient;
-import com.geekbrains.chat.controllers.ChatController;
+import com.tlenparty.chat.NetworkClient;
+import com.tlenparty.chat.controllers.ChatController;
 import javafx.application.Platform;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

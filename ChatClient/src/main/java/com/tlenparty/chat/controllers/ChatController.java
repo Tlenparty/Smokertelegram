@@ -1,8 +1,8 @@
-package com.geekbrains.chat.controllers;
+package com.tlenparty.chat.controllers;
 
 
-import com.geekbrains.chat.NetworkClient;
-import com.geekbrains.chat.models.Network;
+import com.tlenparty.chat.NetworkClient;
+import com.tlenparty.chat.models.Network;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
@@ -134,7 +134,7 @@ public class ChatController {
     public void appendMessage(String message) { // вывод на экран
 
         String timestamp = DateFormat.getInstance().format(new Date());
-        File file = new File(String.format("ChatClient/src/main/resources/com/geekbrains/lib/chatHistory_%s.txt", network.getLogin()));
+        File file = new File(String.format("ChatClient/src/main/resources/com/tlenparty/lib/chatHistory_%s.txt", network.getLogin()));
         if (!file.exists()) {
             try {
                 file.createNewFile();
@@ -162,7 +162,7 @@ public class ChatController {
     }
 
     public void chatHistoryDisplay() {
-        File file = new File(String.format("ChatClient/src/main/resources/com/geekbrains/lib/chatHistory_%s.txt", network.getLogin()));
+        File file = new File(String.format("ChatClient/src/main/resources/com/tlenparty/lib/chatHistory_%s.txt", network.getLogin()));
         if (file.exists()) {
             try (BufferedReader in = new BufferedReader(new FileReader(file))) {
                 String strLine;

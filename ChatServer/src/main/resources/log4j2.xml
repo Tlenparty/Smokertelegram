@@ -16,7 +16,7 @@
     </Appenders>
 
     <Loggers>
-        <Logger name="com.geekbrains" level="debug" />
+        <Logger name="com.tlenparty" level="debug" />
         <Root level="info">
             <AppenderRef ref="STDOUT" />
             <AppenderRef ref="FILE" />

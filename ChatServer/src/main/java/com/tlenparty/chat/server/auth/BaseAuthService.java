@@ -1,4 +1,4 @@
-package com.geekbrains.chat.server.auth;
+package com.tlenparty.chat.server.auth;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

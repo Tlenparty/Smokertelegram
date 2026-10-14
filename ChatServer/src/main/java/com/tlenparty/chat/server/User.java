@@ -1,4 +1,4 @@
-package com.geekbrains.chat.server;
+package com.tlenparty.chat.server;
 
 import java.util.Objects;
 

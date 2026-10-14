@@ -1,4 +1,4 @@
-package com.geekbrains.chat.server.auth;
+package com.tlenparty.chat.server.auth;
 
 import java.sql.SQLException;
 

@@ -1,8 +1,8 @@
-package com.geekbrains.chat.server;
+package com.tlenparty.chat.server;
 
-import com.geekbrains.chat.server.auth.AuthService;
-import com.geekbrains.chat.server.auth.BaseAuthService;
-import com.geekbrains.chat.server.handler.ClientHandler;
+import com.tlenparty.chat.server.auth.AuthService;
+import com.tlenparty.chat.server.auth.BaseAuthService;
+import com.tlenparty.chat.server.handler.ClientHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

@@ -1,8 +1,8 @@
-package com.geekbrains.chat;
+package com.tlenparty.chat;
 
-import com.geekbrains.chat.controllers.AuthController;
-import com.geekbrains.chat.controllers.ChatController;
-import com.geekbrains.chat.models.Network;
+import com.tlenparty.chat.controllers.AuthController;
+import com.tlenparty.chat.controllers.ChatController;
+import com.tlenparty.chat.models.Network;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;

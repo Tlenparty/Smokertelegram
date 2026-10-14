@@ -1,7 +1,7 @@
-package com.geekbrains.chat.controllers;
+package com.tlenparty.chat.controllers;
 
-import com.geekbrains.chat.NetworkClient;
-import com.geekbrains.chat.models.Network;
+import com.tlenparty.chat.NetworkClient;
+import com.tlenparty.chat.models.Network;
 import javafx.fxml.FXML;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
