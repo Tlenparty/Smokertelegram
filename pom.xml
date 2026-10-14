@@ -10,6 +10,7 @@
     <version>1.0-SNAPSHOT</version>
 
     <modules>
+        <module>ChatCommon</module>
         <module>ChatServer</module>
         <module>ChatClient</module>
     </modules>
@@ -22,6 +23,11 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>com.tlenparty.chat</groupId>
+                <artifactId>ChatCommon</artifactId>
+                <version>${project.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.apache.logging.log4j</groupId>
                 <artifactId>log4j-api</artifactId>

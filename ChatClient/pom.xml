@@ -18,6 +18,10 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.tlenparty.chat</groupId>
+            <artifactId>ChatCommon</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
             <version>${javafx.version}</version>
@@ -44,7 +48,7 @@
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
-                    <mainClass>com.tlenparty.chat/com.tlenparty.chat.NetworkClient</mainClass>
+                    <mainClass>com.tlenparty.chat.client/com.tlenparty.chat.client.app.ClientApp</mainClass>
                 </configuration>
             </plugin>
         </plugins>
