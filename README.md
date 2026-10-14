@@ -1,48 +1,48 @@
 # Smokertelegram
 
-Многопользовательский сетевой чат на Java: сервер на сокетах и клиент с GUI на JavaFX.
-Пользователи хранятся в SQLite, история переписки — локально у клиента.
+A multi-user network chat in Java: a socket server and a JavaFX GUI client.
+Users are stored in SQLite; chat history is kept locally on the client.
 
-## Возможности
+## Features
 
-- Авторизация по логину и паролю (таблица `auth` в SQLite, пароли — соль + PBKDF2-SHA256)
-- Общий чат и личные сообщения: получатель выбирается в выпадающем списке или кликом по участнику
-- Список пользователей онлайн, обновляется при входе, выходе и смене ника
-- Смена ника с сохранением в базе и проверкой уникальности
-- История переписки в файле на каждого пользователя; при входе показываются последние 100 строк
-- Закрытие клиента, если вход не выполнен в течение 120 секунд (сервер тоже закрывает такие соединения)
-- Логирование через Log4j 2 (консоль + файл)
+- Login and password authentication (`auth` table in SQLite, passwords salted and hashed with PBKDF2-SHA256)
+- Public chat and private messages: pick the recipient from the drop-down or click a participant
+- Online user list, updated on join, leave and nickname change
+- Nickname change, persisted in the database and checked for uniqueness
+- Per-user chat history file; the last 100 lines are shown after login
+- The client closes if login isn't completed within 120 seconds (the server drops such connections too)
+- Logging with Log4j 2 (console + file)
 
-## Стек
+## Tech stack
 
-| Область | Технологии |
-|---------|------------|
-| Язык | Java 17 |
-| Сборка | Maven (многомодульный проект, Maven Wrapper) |
+| Area | Technologies |
+|------|--------------|
+| Language | Java 17 |
+| Build | Maven (multi-module, Maven Wrapper) |
 | UI | JavaFX 17 (FXML) |
-| Сеть | `java.net.Socket`, `DataInputStream` / `DataOutputStream` |
-| Хранение | SQLite (sqlite-jdbc) |
-| Логирование | Log4j 2 |
-| Тесты | JUnit 5 |
+| Networking | `java.net.Socket`, `DataInputStream` / `DataOutputStream` |
+| Storage | SQLite (sqlite-jdbc) |
+| Logging | Log4j 2 |
+| Tests | JUnit 5 |
 
-## Архитектура
+## Architecture
 
-Три Maven-модуля:
+Three Maven modules:
 
 ```
-ChatCommon/   общий протокол команд (используется сервером и клиентом)
-ChatServer/   сервер
-ChatClient/   JavaFX-клиент
+ChatCommon/   shared command protocol (used by server and client)
+ChatServer/   server
+ChatClient/   JavaFX client
 ```
 
-Зависимости между слоями направлены внутрь: `app` → `transport`/`data`/`presentation` → `domain`.
-Домен не знает ни о сокетах, ни о SQLite, ни о JavaFX. Зависимости собираются вручную в `app`.
+Dependencies point inward: `app` → `transport`/`data`/`presentation` → `domain`.
+The domain knows nothing about sockets, SQLite or JavaFX. Dependencies are wired by hand in `app`.
 
 ### ChatCommon — `com.tlenparty.chat.common.protocol`
 
-- `CommandType` — все команды протокола и их арность
-- `Command` — разбор (`parse`) и сборка (`serialize`) строк протокола, фабрики команд
-- `Protocol` — порт и хост по умолчанию
+- `CommandType` — all protocol commands and their arity
+- `Command` — parsing (`parse`) and serialization (`serialize`) of protocol lines, command factories
+- `Protocol` — default host and port
 
 ### ChatServer — `com.tlenparty.chat.server`
 
@@ -51,103 +51,103 @@ domain/
   model/        User, UserAccount, Message, UsernamePolicy
   repository/   UserRepository, RepositoryException
   security/     PasswordHasher
-  service/      AuthService, PasswordAuthService      — аутентификация
-                ChatRoom, Participant                 — вход/выход, рассылка,
-                PrivateMessageResult, RenameResult      личные сообщения, смена ника
+  service/      AuthService, PasswordAuthService      — authentication
+                ChatRoom, Participant                 — join/leave, broadcast,
+                PrivateMessageResult, RenameResult      private messages, nickname change
 data/           SqliteUserRepository (PreparedStatement), Pbkdf2PasswordHasher
-transport/      SocketServer (accept-цикл, пул потоков), ClientHandler (протокол ⇄ ChatRoom)
-app/            ServerApp (точка входа, сборка зависимостей), ServerConfig, PasswordHashTool
+transport/      SocketServer (accept loop, thread pool), ClientHandler (protocol ⇄ ChatRoom)
+app/            ServerApp (entry point, dependency wiring), ServerConfig, PasswordHashTool
 ```
 
-### ChatClient — `com.tlenparty.chat.client` (JPMS-модуль `com.tlenparty.chat.client`)
+### ChatClient — `com.tlenparty.chat.client` (JPMS module `com.tlenparty.chat.client`)
 
 ```
 domain/         ChatGateway, ChatListener, HistoryRepository, AuthResult
-data/           SocketChatGateway (сетевой клиент), FileHistoryRepository
+data/           SocketChatGateway (network client), FileHistoryRepository
 presentation/   auth/  AuthController + AuthViewModel + auth-view.fxml
                 chat/  ChatController + ChatViewModel + chat-view.fxml
-                FxChatListener (перенос событий в FX-поток), Dialogs, ErrorReporter
-app/            ClientApp (JavaFX Application, навигация между окнами), ClientConfig
+                FxChatListener (dispatches events to the FX thread), Dialogs, ErrorReporter
+app/            ClientApp (JavaFX Application, window navigation), ClientConfig
 ```
 
-FXML лежат в `ChatClient/src/main/resources/com/tlenparty/chat/client/presentation/{auth,chat}/`.
+FXML files live in `ChatClient/src/main/resources/com/tlenparty/chat/client/presentation/{auth,chat}/`.
 
-### Протокол
+### Protocol
 
-Строки передаются через `DataOutputStream.writeUTF`. Последний аргумент текстовых команд может содержать пробелы.
+Lines are sent with `DataOutputStream.writeUTF`. The last argument of text commands may contain spaces.
 
-| Направление | Команда |
-|-------------|---------|
-| клиент → сервер | `/auth <login> <password>`, `/msg <text>`, `/w <recipient> <text>`, `/changeUsername <name>`, `/end` |
-| сервер → клиент | `/authok <name>`, `/autherr <reason>`, `/clientMsg <sender> <text>`, `/privateMsg <sender> <recipient> <text>`, `/serverMsg <text>`, `/userList <name>...`, `/changeUsernameOk <name>`, `/changeUsernameErr <reason>` |
+| Direction | Commands |
+|-----------|----------|
+| client → server | `/auth <login> <password>`, `/msg <text>`, `/w <recipient> <text>`, `/changeUsername <name>`, `/end` |
+| server → client | `/authok <name>`, `/autherr <reason>`, `/clientMsg <sender> <text>`, `/privateMsg <sender> <recipient> <text>`, `/serverMsg <text>`, `/userList <name>...`, `/changeUsernameOk <name>`, `/changeUsernameErr <reason>` |
 
-## Сборка и запуск
+## Build and run
 
-Нужен только JDK 17+; Maven скачивается wrapper'ом.
+Only JDK 17+ is required; Maven is downloaded by the wrapper.
 
 ```bash
 ./mvnw install -DskipTests
 ```
 
-### Сервер
+### Server
 
 ```bash
-java -jar ChatServer/target/chat-server.jar                 # порт 8189, БД ищется автоматически
+java -jar ChatServer/target/chat-server.jar                 # port 8189, database located automatically
 java -jar ChatServer/target/chat-server.jar 9000 /path/to/mainDB.db
 ```
 
-Настройки (приоритет: аргумент → системное свойство → переменная окружения → значение по умолчанию):
+Settings (priority: argument → system property → environment variable → default):
 
-| Параметр | Аргумент | Свойство | Переменная | По умолчанию |
-|----------|----------|----------|------------|--------------|
-| Порт | 1-й | `-Dchat.port` | `CHAT_PORT` | `8189` |
-| Файл БД | 2-й | `-Dchat.db` | `CHAT_DB` | первый существующий из `mainDB.db`, `src/main/resources/mainDB.db`, `ChatServer/src/main/resources/mainDB.db` |
-| Каталог логов | — | `-Dchat.log.dir` | — | `logs` |
+| Setting | Argument | Property | Variable | Default |
+|---------|----------|----------|----------|---------|
+| Port | 1st | `-Dchat.port` | `CHAT_PORT` | `8189` |
+| Database file | 2nd | `-Dchat.db` | `CHAT_DB` | first existing of `mainDB.db`, `src/main/resources/mainDB.db`, `ChatServer/src/main/resources/mainDB.db` |
+| Log directory | — | `-Dchat.log.dir` | — | `logs` |
 
-Если файл БД не найден, сервер завершится с ошибкой (а не создаст пустую базу).
+If the database file isn't found, the server exits with an error instead of creating an empty database.
 
-Хеш пароля для нового пользователя:
+Password hash for a new user:
 
 ```bash
 java -cp ChatServer/target/chat-server.jar com.tlenparty.chat.server.app.PasswordHashTool 'secret'
 ```
 
-### Клиент
+### Client
 
 ```bash
 ./mvnw -pl ChatClient javafx:run
 CHAT_HOST=example.org CHAT_PORT=9000 ./mvnw -pl ChatClient javafx:run
 ```
 
-| Параметр | Свойство / переменная | По умолчанию |
-|----------|-----------------------|--------------|
-| Хост | `chat.host` / `CHAT_HOST` | `localhost` |
-| Порт | `chat.port` / `CHAT_PORT` | `8189` |
-| Каталог истории | `chat.history.dir` / `CHAT_HISTORY_DIR` | `~/.smokertelegram` |
+| Setting | Property / variable | Default |
+|---------|---------------------|---------|
+| Host | `chat.host` / `CHAT_HOST` | `localhost` |
+| Port | `chat.port` / `CHAT_PORT` | `8189` |
+| History directory | `chat.history.dir` / `CHAT_HISTORY_DIR` | `~/.smokertelegram` |
 
-`javafx:run` запускает приложение в отдельной JVM, поэтому из Maven настройки передаются через переменные окружения.
+`javafx:run` starts the app in a separate JVM, so settings are passed from Maven through environment variables.
 
-## Тесты
+## Tests
 
 ```bash
 ./mvnw -pl ChatServer -am test     # ChatCommon + ChatServer
-./mvnw test                        # все модули
+./mvnw test                        # all modules
 ```
 
-- `CommandTest` — разбор и сборка команд протокола
-- `SqliteAuthenticationTest` — вход через SQLite-репозиторий на временной БД: успех, неверный пароль,
-  неизвестный логин, попытки SQL-инъекции, смена ника
-- `Pbkdf2PasswordHasherTest` — хеширование паролей
-- `ChatRoomTest` — рассылка, личные сообщения, смена ника, выход (фейковые участники)
-- `ServerConfigTest` — разрешение порта и пути к БД
-- `SocketServerIntegrationTest` — сервер на свободном порту, два клиента через `Socket`, авторизация и доставка сообщений
+- `CommandTest` — parsing and serializing protocol commands
+- `SqliteAuthenticationTest` — login through the SQLite repository on a temporary database: success, wrong password,
+  unknown login, SQL injection attempts, nickname change
+- `Pbkdf2PasswordHasherTest` — password hashing
+- `ChatRoomTest` — broadcast, private messages, nickname change, leaving (fake participants)
+- `ServerConfigTest` — port and database path resolution
+- `SocketServerIntegrationTest` — server on a free port, two clients over `Socket`, authentication and message delivery
 
-## Тестовые аккаунты
+## Test accounts
 
-| Логин | Пароль | Ник |
-|-------|--------|-----|
+| Login | Password | Nickname |
+|-------|----------|----------|
 | `user1` | `1111` | ВероникаКлубника |
 | `user2` | `2222` | Димас |
 | `user3` | `3333` | Morty |
 
-В `mainDB.db` хранятся только PBKDF2-хеши этих паролей.
+`mainDB.db` stores only the PBKDF2 hashes of these passwords.
