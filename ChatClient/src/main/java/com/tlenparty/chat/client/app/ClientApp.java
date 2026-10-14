@@ -42,7 +42,7 @@ public class ClientApp extends Application {
     @Override
     public void start(Stage primaryStage) throws IOException {
         this.primaryStage = primaryStage;
-        this.config = ClientConfig.fromSystemProperties();
+        this.config = ClientConfig.fromEnvironment();
         this.gateway = new SocketChatGateway(config.host(), config.port());
         try {
             gateway.connect();
