@@ -19,10 +19,11 @@ public record Command(CommandType type, List<String> args) {
                 throw new IllegalArgumentException(type.prefix() + " expects " + type.arity() + " argument(s), got " + args.size());
             }
             for (int i = 0; i < args.size(); i++) {
-                if (i < args.size() - 1) {
+                boolean freeText = type.hasFreeTextTail() && i == args.size() - 1;
+                if (!freeText) {
                     requireToken(type, args.get(i));
                 } else if (args.get(i).isBlank()) {
-                    throw new IllegalArgumentException(type.prefix() + " requires a non-blank last argument");
+                    throw new IllegalArgumentException(type.prefix() + " requires non-blank text");
                 }
             }
         }
@@ -63,7 +64,7 @@ public record Command(CommandType type, List<String> args) {
         if (rest.isEmpty()) {
             return List.of();
         }
-        if (type.isVariadic()) {
+        if (type.isVariadic() || !type.hasFreeTextTail()) {
             return Arrays.asList(WHITESPACE.split(rest));
         }
         return Arrays.asList(WHITESPACE.split(rest, Math.max(type.arity(), 1)));

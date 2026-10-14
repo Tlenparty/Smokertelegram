@@ -24,6 +24,13 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>5.11.3</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
                 <groupId>com.tlenparty.chat</groupId>
                 <artifactId>ChatCommon</artifactId>
                 <version>${project.version}</version>
